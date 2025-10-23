@@ -13,12 +13,12 @@ document.getElementById("loginForm").addEventListener("submit", function(e) {
 
   if (validUsers[username] && validUsers[username] === password) {
     message.style.color = "green";
-    message.textContent = "Login successful! Redirecting...";
+    message.textContent = "Login successful. Redirecting...";
     setTimeout(() => {
       window.location.href = "dashboard.html"; // page after login
     }, 1000);
   } else {
     message.style.color = "#c0392b";
-    message.textContent = "Invalid username or password!";
+    message.textContent = "Invalid username or password.";
   }
 });
