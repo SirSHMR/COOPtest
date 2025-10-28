@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCLdZaRoM241fDHp9f3GlkSY2CiZLzGYZA",
   authDomain: "coopdatabase-f97ed.firebaseapp.com",
   projectId: "coopdatabase-f97ed",
-  storageBucket: "coopdatabase-f97ed.firebasestorage.app",
+  storageBucket: "coopdatabase-f97ed.appspot.com",
   messagingSenderId: "220178541017",
   appId: "1:220178541017:web:9e5bf209aec918a19791c8",
   measurementId: "G-FTZHG0RRVY"
