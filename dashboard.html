@@ -33,11 +33,6 @@
 
     input[type="file"] {
       margin: 10px 0;
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      background: #f8f9fa;
     }
 
     button {
@@ -61,189 +56,23 @@
       word-wrap: break-word;
       font-size: 14px;
       color: #555;
-      padding: 15px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      border: 1px solid #e9ecef;
-      min-height: 20px;
-    }
-
-    .button-group {
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin: 15px 0;
-    }
-
-    /* نظام الإشعارات للداشبورد */
-    .notification {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 15px 20px;
-      border-radius: 10px;
-      color: white;
-      font-weight: 500;
-      z-index: 1000;
-      max-width: 300px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      transform: translateX(400px);
-      transition: transform 0.3s ease;
-    }
-
-    .notification.show {
-      transform: translateX(0);
-    }
-
-    .notification.success {
-      background: #28a745;
-      border-left: 4px solid #1e7e34;
-    }
-
-    .notification.error {
-      background: #dc3545;
-      border-left: 4px solid #c82333;
-    }
-
-    .notification.warning {
-      background: #ffc107;
-      color: #212529;
-      border-left: 4px solid #e0a800;
-    }
-
-    .logout-btn {
-      position: absolute;
-      top: 20px;
-      right: 20px;
-      background: #6c757d;
-      padding: 8px 16px;
-      font-size: 14px;
-    }
-
-    .logout-btn:hover {
-      background: #5a6268;
-    }
-
-    .file-info {
-      background: #e9ecef;
-      padding: 10px;
-      border-radius: 8px;
-      margin: 10px 0;
-      font-size: 14px;
-      color: #495057;
-    }
-
-    .encryption-status {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      margin-left: 10px;
-    }
-
-    .status-encrypted {
-      background: #d4edda;
-      color: #155724;
-    }
-
-    .status-ready {
-      background: #fff3cd;
-      color: #856404;
     }
   </style>
 </head>
 <body>
-  <!-- نظام الإشعارات -->
-  <div id="notification" class="notification" style="display: none;"></div>
-
-  <!-- زر تسجيل الخروج -->
-  <button class="logout-btn" onclick="logout()">Logout</button>
-
   <div class="container">
-    <h2>🔒 File Encryption & Decryption</h2>
-    
-    <!-- معلومات الملف -->
-    <div class="file-info">
-      <span id="fileName">No file selected</span>
-      <span id="encryptionStatus" class="encryption-status status-ready">Ready</span>
-    </div>
-
-    <!-- اختيار الملف -->
+    <h2>File Encryption & Decryption</h2>
     <input type="file" id="fileInput" />
-    
-    <!-- مجموعة الأزرار -->
-    <div class="button-group">
-      <button id="encryptBtn">🔐 Encrypt File</button>
-      <button id="decryptBtn">🔓 Decrypt File</button>
-    </div>
-
-    <!-- زر إضافي لتنزيل الملف المشفر -->
-    <button id="downloadEncryptedBtn" style="display: none; background: #28a745;">📥 Download Encrypted File</button>
-
-    <!-- منطقة النتائج -->
-    <div id="output">Select a file to begin encryption or decryption...</div>
+    <br />
+    <button id="encryptBtn">Encrypt File</button>
+    <button id="decryptBtn">Decrypt File</button>
+    <div id="output"></div>
   </div>
 
   <script>
     let encryptedData;
     let key;
-    let originalFileName = '';
 
-    // دالة عرض الإشعارات
-    function showNotification(message, type = 'error') {
-      const notification = document.getElementById('notification');
-      notification.textContent = message;
-      notification.className = `notification ${type}`;
-      notification.style.display = 'block';
-      
-      setTimeout(() => {
-        notification.classList.add('show');
-      }, 100);
-      
-      setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => {
-          notification.style.display = 'none';
-        }, 300);
-      }, 4000);
-    }
-
-    // دالة تسجيل الخروج
-    function logout() {
-      showNotification("Logged out successfully", "success");
-      setTimeout(() => {
-        window.location.href = "index.html";
-      }, 1500);
-    }
-
-    // تحديث معلومات الملف
-    function updateFileInfo() {
-      const fileInput = document.getElementById('fileInput');
-      const fileName = document.getElementById('fileName');
-      const encryptionStatus = document.getElementById('encryptionStatus');
-      
-      if (fileInput.files.length > 0) {
-        const file = fileInput.files[0];
-        originalFileName = file.name;
-        fileName.textContent = file.name;
-        fileName.title = `Size: ${(file.size / 1024).toFixed(2)} KB`;
-        
-        if (encryptedData) {
-          encryptionStatus.textContent = 'Encrypted';
-          encryptionStatus.className = 'encryption-status status-encrypted';
-        } else {
-          encryptionStatus.textContent = 'Ready';
-          encryptionStatus.className = 'encryption-status status-ready';
-        }
-      } else {
-        fileName.textContent = 'No file selected';
-        encryptionStatus.textContent = 'Ready';
-        encryptionStatus.className = 'encryption-status status-ready';
-      }
-    }
-
-    // توليد المفتاح
     async function generateKey() {
       key = await crypto.subtle.generateKey(
         { name: "AES-GCM", length: 256 },
@@ -252,132 +81,54 @@
       );
     }
 
-    // تشفير الملف
     async function encryptFile() {
       const file = document.getElementById("fileInput").files[0];
       if (!file) {
-        showNotification("Please select a file first", "warning");
+        alert("Please select a file first");
         return;
       }
 
-      try {
-        showNotification("Encrypting file...", "warning");
-        
-        if (!key) await generateKey();
+      if (!key) await generateKey();
 
-        const iv = crypto.getRandomValues(new Uint8Array(12));
-        const arrayBuffer = await file.arrayBuffer();
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const arrayBuffer = await file.arrayBuffer();
 
-        const encrypted = await crypto.subtle.encrypt(
-          { name: "AES-GCM", iv },
-          key,
-          arrayBuffer
-        );
+      const encrypted = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        key,
+        arrayBuffer
+      );
 
-        encryptedData = { 
-          encrypted, 
-          iv,
-          originalName: file.name,
-          encryptedAt: new Date().toLocaleString()
-        };
-
-        document.getElementById("output").innerHTML = `
-          <strong>✅ File Encrypted Successfully!</strong><br>
-          <small>Original: ${file.name}</small><br>
-          <small>Size: ${(file.size / 1024).toFixed(2)} KB</small><br>
-          <small>Encrypted at: ${encryptedData.encryptedAt}</small>
-        `;
-
-        // إظهار زر تنزيل الملف المشفر
-        document.getElementById("downloadEncryptedBtn").style.display = "inline-block";
-        
-        showNotification("File encrypted successfully!", "success");
-        updateFileInfo();
-        
-      } catch (error) {
-        console.error("Encryption error:", error);
-        showNotification("Encryption failed. Please try again.", "error");
-        document.getElementById("output").innerHTML = `<span style="color: #dc3545;">❌ Encryption failed: ${error.message}</span>`;
-      }
+      encryptedData = { encrypted, iv };
+      document.getElementById("output").innerText =
+        "✅ File encrypted successfully!";
     }
 
-    // فك التشفير
     async function decryptFile() {
       if (!encryptedData || !key) {
-        showNotification("No encrypted file found! Please encrypt a file first.", "warning");
+        alert("No file to decrypt!");
         return;
       }
 
-      try {
-        showNotification("Decrypting file...", "warning");
-        
-        const decrypted = await crypto.subtle.decrypt(
-          { name: "AES-GCM", iv: encryptedData.iv },
-          key,
-          encryptedData.encrypted
-        );
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: encryptedData.iv },
+        key,
+        encryptedData.encrypted
+      );
 
-        const blob = new Blob([decrypted]);
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "decrypted_" + encryptedData.originalName;
-        link.click();
+      const blob = new Blob([decrypted]);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "decrypted_file";
+      link.click();
 
-        document.getElementById("output").innerHTML = `
-          <strong>✅ File Decrypted Successfully!</strong><br>
-          <small>Downloaded as: ${"decrypted_" + encryptedData.originalName}</small><br>
-          <small>Size: ${(blob.size / 1024).toFixed(2)} KB</small><br>
-          <small>Decrypted at: ${new Date().toLocaleString()}</small>
-        `;
-
-        showNotification("File decrypted and downloaded!", "success");
-        
-      } catch (error) {
-        console.error("Decryption error:", error);
-        showNotification("Decryption failed. Please try again.", "error");
-        document.getElementById("output").innerHTML = `<span style="color: #dc3545;">❌ Decryption failed: ${error.message}</span>`;
-      }
+      document.getElementById("output").innerText =
+        "✅ File decrypted and downloaded!";
     }
 
-    // تنزيل الملف المشفر
-    function downloadEncryptedFile() {
-      if (!encryptedData) {
-        showNotification("No encrypted file available!", "warning");
-        return;
-      }
-
-      try {
-        const encryptedBlob = new Blob([encryptedData.encrypted]);
-        const url = URL.createObjectURL(encryptedBlob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "encrypted_" + encryptedData.originalName + ".enc";
-        link.click();
-
-        showNotification("Encrypted file downloaded!", "success");
-        document.getElementById("output").innerHTML += `<br><small>📥 Encrypted file saved as: ${link.download}</small>`;
-        
-      } catch (error) {
-        showNotification("Failed to download encrypted file", "error");
-      }
-    }
-
-    // إعداد event listeners عند تحميل الصفحة
-    document.addEventListener('DOMContentLoaded', function() {
-      // إعداد استماع لاختيار الملف
-      document.getElementById("fileInput").addEventListener("change", updateFileInfo);
-      
-      // إعداد أزرار الوظائف
-      document.getElementById("encryptBtn").addEventListener("click", encryptFile);
-      document.getElementById("decryptBtn").addEventListener("click", decryptFile);
-      document.getElementById("downloadEncryptedBtn").addEventListener("click", downloadEncryptedFile);
-      
-      // إظهار رسالة ترحيب
-      setTimeout(() => {
-        showNotification("Welcome to File Encryption Dashboard!", "success");
-      }, 1000);
-    });
+    document.getElementById("encryptBtn").addEventListener("click", encryptFile);
+    document.getElementById("decryptBtn").addEventListener("click", decryptFile);
   </script>
 </body>
 </html>
