@@ -7,7 +7,7 @@ body {
   height: 100vh;
 }
 
-.login-container, .dashboard-container {
+.login-box {
   background: white;
   padding: 40px;
   border-radius: 20px;
@@ -37,9 +37,4 @@ button {
 
 button:hover {
   background: #0056b3;
-}
-
-.message {
-  margin-top: 15px;
-  font-weight: 500;
 }
