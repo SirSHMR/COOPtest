@@ -3,132 +3,81 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>File Encryption Dashboard</title>
-  <link rel="stylesheet" href="style.css" />
-  <style>
-    body {
-      background-color: #f8f9fa;
-      font-family: "Poppins", sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 16px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.1);
-      width: 400px;
-      text-align: center;
-    }
-
-    h2 {
-      margin-bottom: 20px;
-      color: #333;
-    }
-
-    input[type="file"] {
-      margin: 10px 0;
-    }
-
-    button {
-      margin: 5px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      background-color: #007bff;
-      color: white;
-      font-weight: 500;
-      transition: 0.3s;
-    }
-
-    button:hover {
-      background-color: #0056b3;
-    }
-
-    #output {
-      margin-top: 20px;
-      word-wrap: break-word;
-      font-size: 14px;
-      color: #555;
-    }
-  </style>
+  <title>Encryption Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="container">
-    <h2>File Encryption & Decryption</h2>
+  <div class="dashboard-container">
+    <h2>Encryption / Decryption</h2>
+
     <input type="file" id="fileInput" />
-    <br />
+    <br /><br />
+
     <button id="encryptBtn">Encrypt File</button>
     <button id="decryptBtn">Decrypt File</button>
-    <div id="output"></div>
+
+    <p id="message" class="message"></p>
   </div>
 
   <script>
-    let encryptedData;
-    let key;
+    const fileInput = document.getElementById("fileInput");
+    const encryptBtn = document.getElementById("encryptBtn");
+    const decryptBtn = document.getElementById("decryptBtn");
+    const message = document.getElementById("message");
 
-    async function generateKey() {
-      key = await crypto.subtle.generateKey(
-        { name: "AES-GCM", length: 256 },
-        true,
-        ["encrypt", "decrypt"]
-      );
-    }
+    let encryptedData = null;
+    let key = null;
 
-    async function encryptFile() {
-      const file = document.getElementById("fileInput").files[0];
+    // 🔐 تشفير الملف
+    encryptBtn.addEventListener("click", async () => {
+      const file = fileInput.files[0];
       if (!file) {
-        alert("Please select a file first");
+        message.style.color = "red";
+        message.innerText = "⚠️ Please select a file to encrypt.";
         return;
       }
 
-      if (!key) await generateKey();
-
-      const iv = crypto.getRandomValues(new Uint8Array(12));
       const arrayBuffer = await file.arrayBuffer();
-
-      const encrypted = await crypto.subtle.encrypt(
-        { name: "AES-GCM", iv },
-        key,
-        arrayBuffer
-      );
+      key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, arrayBuffer);
 
       encryptedData = { encrypted, iv };
-      document.getElementById("output").innerText =
-        "✅ File encrypted successfully!";
-    }
 
-    async function decryptFile() {
+      message.style.color = "green";
+      message.innerText = "✅ File encrypted successfully!";
+    });
+
+    // 🔓 فك التشفير
+    decryptBtn.addEventListener("click", async () => {
       if (!encryptedData || !key) {
-        alert("No file to decrypt!");
+        message.style.color = "red";
+        message.innerText = "⚠️ No encrypted file found to decrypt.";
         return;
       }
 
-      const decrypted = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: encryptedData.iv },
-        key,
-        encryptedData.encrypted
-      );
+      try {
+        const decrypted = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: encryptedData.iv },
+          key,
+          encryptedData.encrypted
+        );
 
-      const blob = new Blob([decrypted]);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "decrypted_file";
-      link.click();
+        const blob = new Blob([decrypted]);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "decrypted_file";
+        a.click();
 
-      document.getElementById("output").innerText =
-        "✅ File decrypted and downloaded!";
-    }
-
-    document.getElementById("encryptBtn").addEventListener("click", encryptFile);
-    document.getElementById("decryptBtn").addEventListener("click", decryptFile);
+        message.style.color = "green";
+        message.innerText = "✅ File decrypted and downloaded!";
+      } catch (err) {
+        message.style.color = "red";
+        message.innerText = "❌ Error decrypting file. Key may be incorrect.";
+        console.error(err);
+      }
+    });
   </script>
 </body>
 </html>
