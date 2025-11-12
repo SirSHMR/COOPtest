@@ -30,7 +30,7 @@ async function loginUser() {
     return;
   }
 
-  const querySnapshot = await getDocs(collection(db, "employees"));
+  const querySnapshot = await getDocs(collection(db, "Users"));
   let found = false;
 
   querySnapshot.forEach((doc) => {
