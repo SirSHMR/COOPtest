@@ -5,6 +5,7 @@ body {
   justify-content: center;
   align-items: center;
   height: 100vh;
+  margin: 0;
 }
 
 .login-box {
@@ -14,6 +15,7 @@ body {
   box-shadow: 0 0 15px rgba(0,0,0,0.1);
   width: 320px;
   text-align: center;
+  position: relative;
 }
 
 input {
@@ -22,6 +24,7 @@ input {
   margin: 10px 0;
   border-radius: 10px;
   border: 1px solid #ddd;
+  box-sizing: border-box;
 }
 
 button {
@@ -37,4 +40,40 @@ button {
 
 button:hover {
   background: #0056b3;
+}
+
+/* نظام الإشعارات */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 10px;
+  color: white;
+  font-weight: 500;
+  z-index: 1000;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  transform: translateX(400px);
+  transition: transform 0.3s ease;
+}
+
+.notification.show {
+  transform: translateX(0);
+}
+
+.notification.success {
+  background: #28a745;
+  border-left: 4px solid #1e7e34;
+}
+
+.notification.error {
+  background: #dc3545;
+  border-left: 4px solid #c82333;
+}
+
+.notification.warning {
+  background: #ffc107;
+  color: #212529;
+  border-left: 4px solid #e0a800;
 }
