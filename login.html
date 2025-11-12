@@ -19,6 +19,7 @@
     <input type="text" id="username" placeholder="Username" />
     <input type="password" id="password" placeholder="Password" />
     <button onclick="loginUser()">Login</button>
+    <p id="message" style="color:red; margin-top:10px;"></p>
   </div>
 
   <script type="module">
@@ -56,10 +57,12 @@
       });
 
       if (found) {
-        alert("Login successful!");
+        document.getElementById("message").style.color = "green";
+        document.getElementById("message").innerText = "✅ Login successful! Redirecting...";
         window.location.href = "dashboard.html";
       } else {
-        alert("Invalid username or password");
+        document.getElementById("message").style.color = "red";
+        document.getElementById("message").innerText = "❌ Invalid username or password!";
       }
     }
   </script>
