@@ -3,73 +3,80 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Secure File System - Login</title>
-  <style>
-    body { font-family: Poppins, sans-serif; background: #f2f5f9; display: flex; justify-content: center; align-items: center; height: 100vh; }
-    .login-box { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 0 15px rgba(0,0,0,0.1); width: 320px; }
-    input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 10px; border: 1px solid #ddd; }
-    button { width: 100%; background: #007bff; color: white; border: none; padding: 10px; border-radius: 10px; cursor: pointer; font-weight: bold; }
-    button:hover { background: #0056b3; }
-  </style>
+  <title>Secure Login</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
-  <div class="login-box">
-    <h2>Employee Login</h2>
+  <div class="login-container">
+    <h2>Login</h2>
     <input type="text" id="username" placeholder="Username" />
     <input type="password" id="password" placeholder="Password" />
-    <button onclick="loginUser()">Login</button>
-    <p id="message" style="color:red; margin-top:10px;"></p>
+    <button id="loginBtn">Login</button>
+    <p id="message" class="message"></p>
   </div>
 
   <script type="module">
+    // Firebase imports
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
+    // إعداد Firebase
     const firebaseConfig = {
-  apiKey: "AIzaSyCLdZaRoM241fDHp9f3GlkSY2CiZLzGYZA",
-  authDomain: "coopdatabase-f97ed.firebaseapp.com",
-  projectId: "coopdatabase-f97ed",
-  storageBucket: "coopdatabase-f97ed.firebasestorage.app",
-  messagingSenderId: "220178541017",
-  appId: "1:220178541017:web:9e5bf209aec918a19791c8",
-  measurementId: "G-FTZHG0RRVY"
-};
+      apiKey: "AIzaSyCLdZaRoM241fDHp9f3GlkSY2CiZLzGYZA",
+      authDomain: "coopdatabase-f97ed.firebaseapp.com",
+      projectId: "coopdatabase-f97ed",
+      storageBucket: "coopdatabase-f97ed.firebasestorage.app",
+      messagingSenderId: "220178541017",
+      appId: "1:220178541017:web:9e5bf209aec918a19791c8",
+      measurementId: "G-FTZHG0RRVY"
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // تسجيل الدخول
+    const loginBtn = document.getElementById("loginBtn");
+    const message = document.getElementById("message");
+
+    loginBtn.addEventListener("click", loginUser);
+
     async function loginUser() {
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value.trim();
+
       if (!username || !password) {
-        document.getElementById("message").style.color = "red";
-        document.getElementById("message").innerText = "❌ Please enter both fields.";
+        message.style.color = "red";
+        message.innerText = "⚠️ Please enter both username and password.";
         return;
       }
 
-      const querySnapshot = await getDocs(collection(db, "Users"));
-      let found = false;
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.username === username && data.password === password) {
-          found = true;
-        }
-      });
+      try {
+        const querySnapshot = await getDocs(collection(db, "Users"));
+        let found = false;
 
-      if (found) {
-        document.getElementById("message").style.color = "green";
-        document.getElementById("message").innerText = "✅ Login successful! Redirecting...";
-        setTimeout(() => {
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.username === username && data.password === password) {
+            found = true;
+          }
+        });
+
+        if (found) {
+          message.style.color = "green";
+          message.innerText = "✅ Login successful! Redirecting...";
+          setTimeout(() => {
             window.location.href = "dashboard.html";
           }, 1500);
-      } else {
-        document.getElementById("message").style.color = "red";
-        document.getElementById("message").innerText = "❌ Invalid username or password!";
+        } else {
+          message.style.color = "red";
+          message.innerText = "❌ Invalid username or password!";
+        }
+      } catch (err) {
+        message.style.color = "red";
+        message.innerText = "⚠️ Error connecting to database.";
         console.error(err);
       }
     }
   </script>
-
 </body>
 </html>
