@@ -1,4 +1,4 @@
-// Firebase import (إصدار 2025)
+// Firebase import (الإصدار الحديث)
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
@@ -13,21 +13,21 @@ const firebaseConfig = {
   measurementId: "G-FTZHG0RRVY"
 };
 
-// تهيئة التطبيق والاتصال بالقاعدة
+// تهيئة Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// زر تسجيل الدخول
+// العناصر من الصفحة
 const loginBtn = document.getElementById("loginBtn");
-const message = document.getElementById("message"); // عنصر عرض الرسائل في الصفحة
+const message = document.getElementById("message");
 
 loginBtn.addEventListener("click", loginUser);
 
+// 🔐 دالة تسجيل الدخول
 async function loginUser() {
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value.trim();
 
-  // التحقق من المدخلات
   if (!username || !password) {
     showMessage("⚠️ Please enter both username and password.", "error");
     return;
@@ -52,16 +52,15 @@ async function loginUser() {
     } else {
       showMessage("❌ Invalid username or password!", "error");
     }
-  } catch (err) {
-    console.error("Database error:", err);
+  } catch (error) {
+    console.error("Database error:", error);
     showMessage("⚠️ Error connecting to database.", "error");
   }
 }
 
-// دالة عرض الرسائل داخل الصفحة
+// 🎯 دالة لعرض الرسائل
 function showMessage(text, type) {
   message.innerText = text;
   message.style.color = type === "success" ? "green" : "red";
   message.style.fontWeight = "bold";
-  message.style.marginTop = "10px";
 }
