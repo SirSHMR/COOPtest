@@ -19,6 +19,7 @@
     <input type="text" id="username" placeholder="Username" />
     <input type="password" id="password" placeholder="Password" />
     <button onclick="loginUser()">Login</button>
+    <p id="message" class="message"></p>
   </div>
 
   <script type="module">
@@ -42,7 +43,8 @@
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value.trim();
       if (!username || !password) {
-        alert("Please enter both fields");
+        message.style.color = "red";
+        message.innerText = "⚠️ Please enter both username and password.";
         return;
       }
 
@@ -55,13 +57,20 @@
         }
       });
 
-      if (found) {
-        alert("Login successful!");
-        window.location.href = "dashboard.html";
-      } else {
-        alert("Invalid username or password");
-      }
-    }
+       if (found) {
+          message.style.color = "green";
+          message.innerText = "✅ Login successful! Redirecting...";
+          setTimeout(() => {
+            window.location.href = "dashboard.html";
+          }, 1500);
+        } else {
+          message.style.color = "red";
+          message.innerText = "❌ Invalid username or password!";
+        }
+      } catch (err) {
+        message.style.color = "red";
+        message.innerText = "⚠️ Error connecting to database.";
+        console.error(err);
   </script>
 
 </body>
