@@ -38,3 +38,8 @@ button {
 button:hover {
   background: #0056b3;
 }
+
+.message {
+  margin-top: 15px;
+  font-weight: 500;
+}
