@@ -1,40 +1,49 @@
-body {
-  font-family: Poppins, sans-serif;
-  background: #f2f5f9;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-}
+// Firebase import (إصدار 2025)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-.login-box {
-  background: white;
-  padding: 40px;
-  border-radius: 20px;
-  box-shadow: 0 0 15px rgba(0,0,0,0.1);
-  width: 320px;
-  text-align: center;
-}
+// إعداد Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyCLdZaRoM241fDHp9f3GlkSY2CiZLzGYZA",
+  authDomain: "coopdatabase-f97ed.firebaseapp.com",
+  projectId: "coopdatabase-f97ed",
+  storageBucket: "coopdatabase-f97ed.firebasestorage.app",
+  messagingSenderId: "220178541017",
+  appId: "1:220178541017:web:9e5bf209aec918a19791c8",
+  measurementId: "G-FTZHG0RRVY"
+};
 
-input {
-  width: 100%;
-  padding: 10px;
-  margin: 10px 0;
-  border-radius: 10px;
-  border: 1px solid #ddd;
-}
+// تهيئة التطبيق والاتصال بالقاعدة
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-button {
-  width: 100%;
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 10px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: bold;
-}
+// زر تسجيل الدخول
+const loginBtn = document.getElementById("loginBtn");
+loginBtn.addEventListener("click", loginUser);
 
-button:hover {
-  background: #0056b3;
+async function loginUser() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if (!username || !password) {
+    alert("Please enter both fields");
+    return;
+  }
+
+  const querySnapshot = await getDocs(collection(db, "Users"));
+  let found = false;
+
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    if (data.username === username && data.password === password) {
+      found = true;
+    }
+  });
+
+  if (found) {
+    alert("Login successful!");
+    window.location.href = "dashboard.html";
+  } else {
+    alert("Invalid username or password");
+  }
 }
