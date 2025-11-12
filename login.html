@@ -60,10 +60,13 @@
       if (found) {
         document.getElementById("message").style.color = "green";
         document.getElementById("message").innerText = "✅ Login successful! Redirecting...";
-        window.location.href = "dashboard.html";
+        setTimeout(() => {
+            window.location.href = "dashboard.html";
+          }, 1500);
       } else {
         document.getElementById("message").style.color = "red";
         document.getElementById("message").innerText = "❌ Invalid username or password!";
+        console.error(err);
       }
     }
   </script>
