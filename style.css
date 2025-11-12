@@ -36,10 +36,16 @@ button {
   border-radius: 10px;
   cursor: pointer;
   font-weight: bold;
+  transition: background 0.3s ease;
 }
 
 button:hover {
   background: #0056b3;
+}
+
+button:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
 }
 
 /* نظام الإشعارات */
@@ -56,6 +62,9 @@ button:hover {
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   transform: translateX(400px);
   transition: transform 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .notification.show {
@@ -76,4 +85,52 @@ button:hover {
   background: #ffc107;
   color: #212529;
   border-left: 4px solid #e0a800;
+}
+
+.notification.info {
+  background: #17a2b8;
+  border-left: 4px solid #138496;
+}
+
+/* أيقونات الإشعارات */
+.notification::before {
+  font-size: 18px;
+}
+
+.notification.success::before {
+  content: "✅";
+}
+
+.notification.error::before {
+  content: "❌";
+}
+
+.notification.warning::before {
+  content: "⚠️";
+}
+
+.notification.info::before {
+  content: "ℹ️";
+}
+
+/* تحميل */
+.loading {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* تأثيرات إضافية */
+.login-box input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
 }
