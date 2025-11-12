@@ -19,34 +19,49 @@ const db = getFirestore(app);
 
 // زر تسجيل الدخول
 const loginBtn = document.getElementById("loginBtn");
+const message = document.getElementById("message"); // عنصر عرض الرسائل في الصفحة
+
 loginBtn.addEventListener("click", loginUser);
 
 async function loginUser() {
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value.trim();
 
+  // التحقق من المدخلات
   if (!username || !password) {
-    message.style.color = "red";
-    message.innerText = "⚠️ Please enter both username and password.";
+    showMessage("⚠️ Please enter both username and password.", "error");
     return;
   }
 
-  const querySnapshot = await getDocs(collection(db, "Users"));
-  let found = false;
+  try {
+    const querySnapshot = await getDocs(collection(db, "Users"));
+    let found = false;
 
-  querySnapshot.forEach((doc) => {
-    const data = doc.data();
-    if (data.username === username && data.password === password) {
-      found = true;
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.username === username && data.password === password) {
+        found = true;
+      }
+    });
+
+    if (found) {
+      showMessage("✅ Login successful! Redirecting...", "success");
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 1500);
+    } else {
+      showMessage("❌ Invalid username or password!", "error");
     }
-  });
-
-  if (found) {
-    document.getElementById("message").style.color = "green";
-    document.getElementById("message").innerText = "✅ Login successful! Redirecting...";
-    window.location.href = "dashboard.html";
-  } else {
-    document.getElementById("message").style.color = "red";
-    document.getElementById("message").innerText = "❌ Invalid username or password!";
+  } catch (err) {
+    console.error("Database error:", err);
+    showMessage("⚠️ Error connecting to database.", "error");
   }
+}
+
+// دالة عرض الرسائل داخل الصفحة
+function showMessage(text, type) {
+  message.innerText = text;
+  message.style.color = type === "success" ? "green" : "red";
+  message.style.fontWeight = "bold";
+  message.style.marginTop = "10px";
 }
