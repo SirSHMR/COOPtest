@@ -1,77 +1,40 @@
-/* Reset */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 body {
-  font-family: 'Poppins', sans-serif;
-  background: linear-gradient(135deg, #007bff, #6c63ff);
+  font-family: Poppins, sans-serif;
+  background: #f2f5f9;
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
-  color: #333;
 }
 
-/* صندوق تسجيل الدخول */
-.login-container {
-  background: #fff;
+.login-box {
+  background: white;
   padding: 40px;
   border-radius: 20px;
-  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  width: 320px;
   text-align: center;
-  width: 350px;
-  animation: fadeIn 0.8s ease-in-out;
-}
-
-.login-container h2 {
-  margin-bottom: 20px;
-  color: #333;
-  font-size: 22px;
 }
 
 input {
   width: 100%;
-  padding: 12px;
+  padding: 10px;
   margin: 10px 0;
   border-radius: 10px;
-  border: 1px solid #ccc;
-  font-size: 15px;
-  transition: border 0.2s;
-}
-
-input:focus {
-  border-color: #007bff;
-  outline: none;
+  border: 1px solid #ddd;
 }
 
 button {
   width: 100%;
   background: #007bff;
-  color: #fff;
+  color: white;
   border: none;
-  padding: 12px;
+  padding: 10px;
   border-radius: 10px;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 16px;
-  transition: background 0.2s;
+  font-weight: bold;
 }
 
 button:hover {
   background: #0056b3;
-}
-
-.message {
-  margin-top: 15px;
-  font-weight: 500;
-  font-size: 14px;
-}
-
-/* حركة بسيطة */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
 }
