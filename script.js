@@ -26,7 +26,8 @@ async function loginUser() {
   const password = document.getElementById("password").value.trim();
 
   if (!username || !password) {
-    alert("Please enter both fields");
+    message.style.color = "red";
+    message.innerText = "⚠️ Please enter both username and password.";
     return;
   }
 
