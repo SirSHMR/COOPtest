@@ -2,19 +2,133 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>File Encryption Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
   <style>
-    body { font-family: Poppins, sans-serif; background-color: #f2f5f9; text-align: center; padding: 50px; }
-    .box { background: white; padding: 30px; border-radius: 15px; width: 400px; margin: auto; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
-    button { margin: 10px; padding: 10px 20px; border: none; border-radius: 10px; background: #007bff; color: white; cursor: pointer; font-weight: bold; }
-    button:hover { background: #0056b3; }
+    body {
+      background-color: #f8f9fa;
+      font-family: "Poppins", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      width: 400px;
+      text-align: center;
+    }
+
+    h2 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    input[type="file"] {
+      margin: 10px 0;
+    }
+
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: white;
+      font-weight: 500;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #output {
+      margin-top: 20px;
+      word-wrap: break-word;
+      font-size: 14px;
+      color: #555;
+    }
   </style>
 </head>
 <body>
-  <div class="box">
-    <h2>Welcome to the Secure File System</h2>
-    <button>Encrypt File</button>
-    <button>Decrypt File</button>
+  <div class="container">
+    <h2>File Encryption & Decryption</h2>
+    <input type="file" id="fileInput" />
+    <br />
+    <button id="encryptBtn">Encrypt File</button>
+    <button id="decryptBtn">Decrypt File</button>
+    <div id="output"></div>
   </div>
+
+  <script>
+    let encryptedData;
+    let key;
+
+    async function generateKey() {
+      key = await crypto.subtle.generateKey(
+        { name: "AES-GCM", length: 256 },
+        true,
+        ["encrypt", "decrypt"]
+      );
+    }
+
+    async function encryptFile() {
+      const file = document.getElementById("fileInput").files[0];
+      if (!file) {
+        alert("Please select a file first");
+        return;
+      }
+
+      if (!key) await generateKey();
+
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const arrayBuffer = await file.arrayBuffer();
+
+      const encrypted = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        key,
+        arrayBuffer
+      );
+
+      encryptedData = { encrypted, iv };
+      document.getElementById("output").innerText =
+        "✅ File encrypted successfully!";
+    }
+
+    async function decryptFile() {
+      if (!encryptedData || !key) {
+        alert("No file to decrypt!");
+        return;
+      }
+
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: encryptedData.iv },
+        key,
+        encryptedData.encrypted
+      );
+
+      const blob = new Blob([decrypted]);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "decrypted_file";
+      link.click();
+
+      document.getElementById("output").innerText =
+        "✅ File decrypted and downloaded!";
+    }
+
+    document.getElementById("encryptBtn").addEventListener("click", encryptFile);
+    document.getElementById("decryptBtn").addEventListener("click", decryptFile);
+  </script>
 </body>
 </html>
