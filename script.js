@@ -41,9 +41,11 @@ async function loginUser() {
   });
 
   if (found) {
-    alert("Login successful!");
+    document.getElementById("message").style.color = "green";
+    document.getElementById("message").innerText = "✅ Login successful! Redirecting...";
     window.location.href = "dashboard.html";
   } else {
-    alert("Invalid username or password");
+    document.getElementById("message").style.color = "red";
+    document.getElementById("message").innerText = "❌ Invalid username or password!";
   }
 }
