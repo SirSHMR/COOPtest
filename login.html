@@ -1,31 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Secure File System - Login</title>
-  <style>
-    body { font-family: Poppins, sans-serif; background: #f2f5f9; display: flex; justify-content: center; align-items: center; height: 100vh; }
-    .login-box { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 0 15px rgba(0,0,0,0.1); width: 320px; }
-    input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 10px; border: 1px solid #ddd; }
-    button { width: 100%; background: #007bff; color: white; border: none; padding: 10px; border-radius: 10px; cursor: pointer; font-weight: bold; }
-    button:hover { background: #0056b3; }
-  </style>
-</head>
-<body>
+// Firebase import (إصدار 2025)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-  <div class="login-box">
-    <h2>Employee Login</h2>
-    <input type="text" id="username" placeholder="Username" />
-    <input type="password" id="password" placeholder="Password" />
-    <button onclick="loginUser()">Login</button>
-  </div>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-
-    const firebaseConfig = {
+// إعداد Firebase
+const firebaseConfig = {
   apiKey: "AIzaSyCLdZaRoM241fDHp9f3GlkSY2CiZLzGYZA",
   authDomain: "coopdatabase-f97ed.firebaseapp.com",
   projectId: "coopdatabase-f97ed",
@@ -35,34 +13,37 @@
   measurementId: "G-FTZHG0RRVY"
 };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+// تهيئة التطبيق والاتصال بالقاعدة
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
-    async function loginUser() {
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value.trim();
-      if (!username || !password) {
-        alert("Please enter both fields");
-        return;
-      }
+// زر تسجيل الدخول
+const loginBtn = document.getElementById("loginBtn");
+loginBtn.addEventListener("click", loginUser);
 
-      const querySnapshot = await getDocs(collection(db, "Users"));
-      let found = false;
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.username === username && data.password === password) {
-          found = true;
-        }
-      });
+async function loginUser() {
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
 
-      if (found) {
-        alert("Login successful!");
-        window.location.href = "dashboard.html";
-      } else {
-        alert("Invalid username or password");
-      }
+  if (!username || !password) {
+    alert("Please enter both fields");
+    return;
+  }
+
+  const querySnapshot = await getDocs(collection(db, "Users"));
+  let found = false;
+
+  querySnapshot.forEach((doc) => {
+    const data = doc.data();
+    if (data.username === username && data.password === password) {
+      found = true;
     }
-  </script>
+  });
 
-</body>
-</html>
+  if (found) {
+    alert("Login successful!");
+    window.location.href = "dashboard.html";
+  } else {
+    alert("Invalid username or password");
+  }
+}
