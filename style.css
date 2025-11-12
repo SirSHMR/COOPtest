@@ -7,7 +7,7 @@ body {
   height: 100vh;
 }
 
-.login-box {
+.login-container, .dashboard-container {
   background: white;
   padding: 40px;
   border-radius: 20px;
