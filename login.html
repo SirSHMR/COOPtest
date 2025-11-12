@@ -3,81 +3,66 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Secure Login</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>Secure File System - Login</title>
+  <style>
+    body { font-family: Poppins, sans-serif; background: #f2f5f9; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    .login-box { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 0 15px rgba(0,0,0,0.1); width: 320px; }
+    input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 10px; border: 1px solid #ddd; }
+    button { width: 100%; background: #007bff; color: white; border: none; padding: 10px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+    button:hover { background: #0056b3; }
+  </style>
 </head>
 <body>
-  <div class="login-container">
-    <h2>Login</h2>
+
+  <div class="login-box">
+    <h2>Employee Login</h2>
     <input type="text" id="username" placeholder="Username" />
     <input type="password" id="password" placeholder="Password" />
-    <button id="loginBtn">Login</button>
-    <p id="message" class="message"></p>
-    <script type="module" src="script.js"></script>
+    <button onclick="loginUser()">Login</button>
   </div>
 
   <script type="module">
-    // Firebase imports
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-    // إعداد Firebase
     const firebaseConfig = {
-      apiKey: "AIzaSyCLdZaRoM241fDHp9f3GlkSY2CiZLzGYZA",
-      authDomain: "coopdatabase-f97ed.firebaseapp.com",
-      projectId: "coopdatabase-f97ed",
-      storageBucket: "coopdatabase-f97ed.firebasestorage.app",
-      messagingSenderId: "220178541017",
-      appId: "1:220178541017:web:9e5bf209aec918a19791c8",
-      measurementId: "G-FTZHG0RRVY"
-    };
+  apiKey: "AIzaSyCLdZaRoM241fDHp9f3GlkSY2CiZLzGYZA",
+  authDomain: "coopdatabase-f97ed.firebaseapp.com",
+  projectId: "coopdatabase-f97ed",
+  storageBucket: "coopdatabase-f97ed.firebasestorage.app",
+  messagingSenderId: "220178541017",
+  appId: "1:220178541017:web:9e5bf209aec918a19791c8",
+  measurementId: "G-FTZHG0RRVY"
+};
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // تسجيل الدخول
-    const loginBtn = document.getElementById("loginBtn");
-    const message = document.getElementById("message");
-
-    loginBtn.addEventListener("click", loginUser);
-
     async function loginUser() {
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value.trim();
-
       if (!username || !password) {
-        message.style.color = "red";
-        message.innerText = "⚠️ Please enter both username and password.";
+        alert("Please enter both fields");
         return;
       }
 
-      try {
-        const querySnapshot = await getDocs(collection(db, "Users"));
-        let found = false;
-
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.username === username && data.password === password) {
-            found = true;
-          }
-        });
-
-        if (found) {
-          message.style.color = "green";
-          message.innerText = "✅ Login successful! Redirecting...";
-          setTimeout(() => {
-            window.location.href = "dashboard.html";
-          }, 1500);
-        } else {
-          message.style.color = "red";
-          message.innerText = "❌ Invalid username or password!";
+      const querySnapshot = await getDocs(collection(db, "Users"));
+      let found = false;
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.username === username && data.password === password) {
+          found = true;
         }
-      } catch (err) {
-        message.style.color = "red";
-        message.innerText = "⚠️ Error connecting to database.";
-        console.error(err);
+      });
+
+      if (found) {
+        alert("Login successful!");
+        window.location.href = "dashboard.html";
+      } else {
+        alert("Invalid username or password");
       }
     }
   </script>
+
 </body>
 </html>
