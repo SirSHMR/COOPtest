@@ -21,29 +21,58 @@ const db = getFirestore(app);
 const loginBtn = document.getElementById("loginBtn");
 loginBtn.addEventListener("click", loginUser);
 
+// دالة عرض الإشعارات
+function showNotification(message, type = 'error') {
+  const notification = document.getElementById('notification');
+  notification.textContent = message;
+  notification.className = `notification ${type}`;
+  notification.style.display = 'block';
+  
+  // إظهار الإشعار
+  setTimeout(() => {
+    notification.classList.add('show');
+  }, 100);
+  
+  // إخفاء الإشعار تلقائياً بعد 4 ثواني
+  setTimeout(() => {
+    notification.classList.remove('show');
+    setTimeout(() => {
+      notification.style.display = 'none';
+    }, 300);
+  }, 4000);
+}
+
 async function loginUser() {
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value.trim();
 
   if (!username || !password) {
-    alert("Please enter both fields");
+    showNotification("Please enter both fields", "warning");
     return;
   }
 
-  const querySnapshot = await getDocs(collection(db, "Users"));
-  let found = false;
+  try {
+    const querySnapshot = await getDocs(collection(db, "Users"));
+    let found = false;
 
-  querySnapshot.forEach((doc) => {
-    const data = doc.data();
-    if (data.username === username && data.password === password) {
-      found = true;
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.username === username && data.password === password) {
+        found = true;
+      }
+    });
+
+    if (found) {
+      showNotification("Login successful! Redirecting...", "success");
+      // الانتقال بعد ثانيتين لرؤية الرسالة
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 2000);
+    } else {
+      showNotification("Invalid username or password", "error");
     }
-  });
-
-  if (found) {
-    alert("Login successful!");
-    window.location.href = "dashboard.html";
-  } else {
-    alert("Invalid username or password");
+  } catch (error) {
+    showNotification("Network error. Please try again.", "error");
+    console.error("Login error:", error);
   }
 }
