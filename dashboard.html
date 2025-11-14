@@ -62,6 +62,7 @@
 <body>
   <div class="container">
     <h2>File Encryption & Decryption</h2>
+    <div id="message" class="message"></div>
     <input type="file" id="fileInput" />
     <br />
     <button id="encryptBtn">Encrypt File</button>
@@ -72,6 +73,13 @@
   <script>
     let encryptedData;
     let key;
+
+    function showMessage(text, type = "error") {
+      const msg = document.getElementById("message");
+      msg.textContent = text;
+      msg.className = "message " + type;
+      msg.style.display = "block";
+    }
 
     async function generateKey() {
       key = await crypto.subtle.generateKey(
@@ -84,7 +92,7 @@
     async function encryptFile() {
       const file = document.getElementById("fileInput").files[0];
       if (!file) {
-        alert("Please select a file first");
+        showMessage("Please select a file first", "error");
         return;
       }
 
@@ -100,13 +108,12 @@
       );
 
       encryptedData = { encrypted, iv };
-      document.getElementById("output").innerText =
-        "✅ File encrypted successfully!";
+      showMessage("✅ File encrypted successfully!", "success");
     }
 
     async function decryptFile() {
       if (!encryptedData || !key) {
-        alert("No file to decrypt!");
+        showMessage("No file to decrypt!", "error");
         return;
       }
 
@@ -123,8 +130,7 @@
       link.download = "decrypted_file";
       link.click();
 
-      document.getElementById("output").innerText =
-        "✅ File decrypted and downloaded!";
+      showMessage("✅ File decrypted and downloaded!", "success");
     }
 
     document.getElementById("encryptBtn").addEventListener("click", encryptFile);
