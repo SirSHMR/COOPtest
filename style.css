@@ -38,3 +38,24 @@ button {
 button:hover {
   background: #0056b3;
 }
+
+.message {
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  text-align: center;
+  display: none;
+}
+
+.message.error {
+  background-color: #ffdddd;
+  color: #b30000;
+  border: 1px solid #ff5c5c;
+}
+
+.message.success {
+  background-color: #ddffdd;
+  color: #005c0a;
+  border: 1px solid #58d168;
+}
