@@ -17,6 +17,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+
+function showMessage(text, type = "error") {
+  const msg = document.getElementById("message");
+  msg.textContent = text;
+  msg.className = "message " + type;
+  msg.style.display = "block";
+}
+
 // زر تسجيل الدخول
 const loginBtn = document.getElementById("loginBtn");
 loginBtn.addEventListener("click", loginUser);
@@ -26,7 +34,7 @@ async function loginUser() {
   const password = document.getElementById("password").value.trim();
 
   if (!username || !password) {
-    alert("Please enter both fields");
+    showMessage("Please enter both fields", "error");
     return;
   }
 
@@ -41,9 +49,10 @@ async function loginUser() {
   });
 
   if (found) {
-    alert("Login successful!");
+    showMessage("Login successful!", "success");
+    setTimeout(() => { window.location.href = "dashboard.html"; }, 800);
     window.location.href = "dashboard.html";
   } else {
-    alert("Invalid username or password");
+    showMessage("Invalid username or password", "error");
   }
 }
