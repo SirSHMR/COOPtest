@@ -51,7 +51,6 @@ async function loginUser() {
   if (found) {
     showMessage("Login successful!", "success");
     setTimeout(() => { window.location.href = "dashboard.html"; }, 800);
-    window.location.href = "dashboard.html";
   } else {
     showMessage("Invalid username or password", "error");
   }
