@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>File Encryption Dashboard</title>
   <link rel="stylesheet" href="style.css" />
+
   <style>
     body {
-      background-color: #f8f9fa;
+      background-color: #f2f5f9;
       font-family: "Poppins", sans-serif;
       display: flex;
-      flex-direction: column;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       height: 100vh;
       margin: 0;
     }
@@ -22,119 +22,112 @@
       padding: 30px;
       border-radius: 16px;
       box-shadow: 0 0 15px rgba(0,0,0,0.1);
-      width: 400px;
+      width: 420px;
       text-align: center;
     }
 
     h2 {
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       color: #333;
     }
 
-    input[type="file"] {
-      margin: 10px 0;
+    input[type="file"],
+    select {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0 15px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
     }
 
     button {
-      margin: 5px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
+      width: 100%;
+      padding: 12px;
       background-color: #007bff;
+      border: none;
       color: white;
-      font-weight: 500;
-      transition: 0.3s;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 10px;
     }
 
     button:hover {
       background-color: #0056b3;
     }
 
-    #output {
-      margin-top: 20px;
-      word-wrap: break-word;
+    .msgBox {
+      margin-bottom: 15px;
+      padding: 12px;
+      border-radius: 10px;
+      display: none;
       font-size: 14px;
-      color: #555;
+      font-weight: 500;
+    }
+
+    .errorMsg {
+      background: #ffdddd;
+      color: #d60000;
+      border-left: 5px solid #d60000;
+    }
+
+    .successMsg {
+      background: #ddffdd;
+      color: #0c8b0c;
+      border-left: 5px solid #0c8b0c;
     }
   </style>
+
 </head>
 <body>
+
   <div class="container">
-    <h2>File Encryption & Decryption</h2>
-    <div id="message" class="message"></div>
+    <h2>Encrypt File</h2>
+
+    <!-- صندوق الرسائل -->
+    <div id="messageBox" class="msgBox"></div>
+
+    <!-- رفع ملف -->
     <input type="file" id="fileInput" />
-    <br />
-    <button id="encryptBtn">Encrypt File</button>
-    <button id="decryptBtn">Decrypt File</button>
-    <div id="output"></div>
+
+    <!-- اختيار الموظف المسموح له -->
+    <select id="allowedUser">
+      <option value="">Select employee allowed to view this file</option>
+      <option value="employee1">Employee 1</option>
+      <option value="employee2">Employee 2</option>
+      <option value="employee3">Employee 3</option>
+    </select>
+
+    <!-- زر التشفير -->
+    <button id="encryptBtn">Encrypt & Upload</button>
   </div>
 
   <script>
-    let encryptedData;
-    let key;
-
-    function showMessage(text, type = "error") {
-      const msg = document.getElementById("message");
-      msg.textContent = text;
-      msg.className = "message " + type;
-      msg.style.display = "block";
+    function showMessage(type, text) {
+      const box = document.getElementById("messageBox");
+      box.className = "msgBox " + (type === "error" ? "errorMsg" : "successMsg");
+      box.textContent = text;
+      box.style.display = "block";
     }
 
-    async function generateKey() {
-      key = await crypto.subtle.generateKey(
-        { name: "AES-GCM", length: 256 },
-        true,
-        ["encrypt", "decrypt"]
-      );
-    }
-
-    async function encryptFile() {
+    document.getElementById("encryptBtn").addEventListener("click", () => {
       const file = document.getElementById("fileInput").files[0];
+      const allowed = document.getElementById("allowedUser").value;
+
       if (!file) {
-        showMessage("Please select a file first", "error");
+        showMessage("error", "Please select a file.");
         return;
       }
 
-      if (!key) await generateKey();
-
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const arrayBuffer = await file.arrayBuffer();
-
-      const encrypted = await crypto.subtle.encrypt(
-        { name: "AES-GCM", iv },
-        key,
-        arrayBuffer
-      );
-
-      encryptedData = { encrypted, iv };
-      showMessage("✅ File encrypted successfully!", "success");
-    }
-
-    async function decryptFile() {
-      if (!encryptedData || !key) {
-        showMessage("No file to decrypt!", "error");
+      if (!allowed) {
+        showMessage("error", "Please select an employee who can access the file.");
         return;
       }
 
-      const decrypted = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: encryptedData.iv },
-        key,
-        encryptedData.encrypted
-      );
-
-      const blob = new Blob([decrypted]);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "decrypted_file";
-      link.click();
-
-      showMessage("✅ File decrypted and downloaded!", "success");
-    }
-
-    document.getElementById("encryptBtn").addEventListener("click", encryptFile);
-    document.getElementById("decryptBtn").addEventListener("click", decryptFile);
+      // لاحقًا نضيف التشفير الحقيقي
+      showMessage("success", "File ready for encryption.");
+    });
   </script>
+
 </body>
 </html>
