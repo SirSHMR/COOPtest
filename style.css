@@ -1,12 +1,11 @@
+/* عام */
 body {
   font-family: Poppins, sans-serif;
   background: #f2f5f9;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+  margin: 0;
 }
 
+/* Login Box */
 .login-box {
   background: white;
   padding: 40px;
@@ -14,9 +13,10 @@ body {
   box-shadow: 0 0 15px rgba(0,0,0,0.1);
   width: 320px;
   text-align: center;
+  margin: 100px auto;
 }
 
-input {
+.login-box input {
   width: 100%;
   padding: 10px;
   margin: 10px 0;
@@ -24,18 +24,18 @@ input {
   border: 1px solid #ddd;
 }
 
-button {
+.login-box button {
   width: 100%;
+  padding: 10px;
   background: #007bff;
   color: white;
   border: none;
-  padding: 10px;
   border-radius: 10px;
   cursor: pointer;
   font-weight: bold;
 }
 
-button:hover {
+.login-box button:hover {
   background: #0056b3;
 }
 
@@ -58,4 +58,73 @@ button:hover {
   background-color: #ddffdd;
   color: #005c0a;
   border: 1px solid #58d168;
+}
+
+/* Dashboard Box */
+.container {
+  background: white;
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  width: 420px;
+  text-align: center;
+  margin: 10px;
+}
+
+input[type="file"],
+select {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0 15px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+}
+
+button {
+  width: 100%;
+  padding: 12px;
+  background-color: #007bff;
+  border: none;
+  color: white;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+button:hover {
+  background-color: #0056b3;
+}
+
+.msgBox {
+  margin-bottom: 15px;
+  padding: 12px;
+  border-radius: 10px;
+  display: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.errorMsg {
+  background: #ffdddd;
+  color: #d60000;
+  border-left: 5px solid #d60000;
+}
+
+.successMsg {
+  background: #ddffdd;
+  color: #0c8b0c;
+  border-left: 5px solid #0c8b0c;
+}
+
+.received-files {
+  margin-top: 20px;
+  text-align: left;
+}
+
+.file-item {
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: #f7f7f7;
+  border: 1px solid #ddd;
 }
