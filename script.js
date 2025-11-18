@@ -17,7 +17,7 @@ function showMessage(text, type = "error") {
 }
 
 async function loginUser() {
-  const emailInput = document.getElementById("email") || document.getElementById("username");
+  const emailInput = document.getElementById("Email") || document.getElementById("username");
   const passwordInput = document.getElementById("password");
 
   if (!emailInput || !passwordInput) return;
