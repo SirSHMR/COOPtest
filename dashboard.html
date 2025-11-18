@@ -3,28 +3,38 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>File Encryption Dashboard</title>
+  <title>Employee Dashboard</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <h2>Encrypt & Upload File</h2>
-    <div id="messageBox" class="msgBox"></div>
-    <input type="file" id="fileInput" />
-    <select id="allowedUser">
-      <option value="">Select employee allowed to view this file</option>
-      <option value="employee1">Employee 1</option>
-      <option value="employee2">Employee 2</option>
-      <option value="employee3">Employee 3</option>
-    </select>
-    <button id="encryptBtn">Encrypt & Upload</button>
+  <div class="dashboard-container">
+    <!-- مربع إرسال الملف -->
+    <div class="container">
+      <h2>Encrypt & Send File</h2>
+      <div id="messageBox" class="msgBox"></div>
+      
+      <input type="file" id="fileInput">
+      
+      <label for="allowedUser">Send to Employee:</label>
+      <select id="allowedUser">
+        <option value="">Select Employee</option>
+      </select>
+      
+      <button id="encryptBtn">Encrypt & Send</button>
+    </div>
+
+    <!-- مربع المستندات المستلمة -->
+    <div class="container">
+      <h2>Received Documents</h2>
+      <div id="receivedList" class="received-files">
+        <!-- سيتم ملء هذا القسم بالملفات المستلمة -->
+      </div>
+    </div>
+
+    <button id="logoutBtn" style="width: 200px; margin-top: 20px;">Logout</button>
   </div>
 
-  <div class="container">
-    <h2>Received Files</h2>
-    <div id="receivedList" class="received-files"></div>
-  </div>
-
-  <script type="module" src="script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="dashboard.js"></script>
 </body>
 </html>
