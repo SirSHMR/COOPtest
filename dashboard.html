@@ -5,101 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>File Encryption Dashboard</title>
   <link rel="stylesheet" href="style.css" />
-
-  <style>
-    body {
-      background-color: #f2f5f9;
-      font-family: "Poppins", sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      padding-top: 50px;
-      margin: 0;
-      gap: 20px;
-    }
-
-    .container {
-      background: white;
-      padding: 30px;
-      border-radius: 16px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.1);
-      width: 420px;
-      text-align: center;
-    }
-
-    h2 {
-      margin-bottom: 15px;
-      color: #333;
-    }
-
-    input[type="file"],
-    select {
-      width: 100%;
-      padding: 10px;
-      margin: 10px 0 15px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-    }
-
-    button {
-      width: 100%;
-      padding: 12px;
-      background-color: #007bff;
-      border: none;
-      color: white;
-      border-radius: 10px;
-      cursor: pointer;
-      font-weight: bold;
-      margin-top: 10px;
-    }
-
-    button:hover {
-      background-color: #0056b3;
-    }
-
-    .msgBox {
-      margin-bottom: 15px;
-      padding: 12px;
-      border-radius: 10px;
-      display: none;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .errorMsg {
-      background: #ffdddd;
-      color: #d60000;
-      border-left: 5px solid #d60000;
-    }
-
-    .successMsg {
-      background: #ddffdd;
-      color: #0c8b0c;
-      border-left: 5px solid #0c8b0c;
-    }
-
-    /* قائمة الملفات المستلمة */
-    .received-files {
-      margin-top: 20px;
-      text-align: left;
-    }
-
-    .file-item {
-      padding: 10px;
-      margin-bottom: 10px;
-      border-radius: 10px;
-      background: #f7f7f7;
-      border: 1px solid #ddd;
-    }
-  </style>
-
 </head>
 <body>
 
   <!-- بوكس رفع الملفات -->
   <div class="container">
     <h2>Encrypt & Upload File</h2>
-
     <div id="messageBox" class="msgBox"></div>
 
     <input type="file" id="fileInput" />
@@ -116,44 +27,9 @@
   <!-- بوكس الملفات المستلمة -->
   <div class="container">
     <h2>Received Files</h2>
-    <div id="receivedList" class="received-files">
-      <!-- لاحقًا سيتم إضافة الملفات هنا -->
-    </div>
+    <div id="receivedList" class="received-files"></div>
   </div>
 
-  <script>
-    function showMessage(type, text) {
-      const box = document.getElementById("messageBox");
-      box.className = "msgBox " + (type === "error" ? "errorMsg" : "successMsg");
-      box.textContent = text;
-      box.style.display = "block";
-    }
-
-    document.getElementById("encryptBtn").addEventListener("click", () => {
-      const file = document.getElementById("fileInput").files[0];
-      const allowed = document.getElementById("allowedUser").value;
-
-      if (!file) {
-        showMessage("error", "Please select a file.");
-        return;
-      }
-
-      if (!allowed) {
-        showMessage("error", "Please select an employee who can access the file.");
-        return;
-      }
-
-      // لاحقًا نضيف التشفير والرفع
-      showMessage("success", "File ready for encryption.");
-
-      // مثال لإضافة الملف للقائمة المستلمة (محاكاة)
-      const receivedList = document.getElementById("receivedList");
-      const div = document.createElement("div");
-      div.className = "file-item";
-      div.textContent = `${file.name} → Allowed for: ${allowed}`;
-      receivedList.appendChild(div);
-    });
-  </script>
-
+  <script src="dashboard.js" type="module"></script>
 </body>
 </html>
