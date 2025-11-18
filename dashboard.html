@@ -12,9 +12,10 @@
       font-family: "Poppins", sans-serif;
       display: flex;
       justify-content: center;
-      align-items: center;
-      height: 100vh;
+      align-items: flex-start;
+      padding-top: 50px;
       margin: 0;
+      gap: 20px;
     }
 
     .container {
@@ -76,21 +77,32 @@
       color: #0c8b0c;
       border-left: 5px solid #0c8b0c;
     }
+
+    /* قائمة الملفات المستلمة */
+    .received-files {
+      margin-top: 20px;
+      text-align: left;
+    }
+
+    .file-item {
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 10px;
+      background: #f7f7f7;
+      border: 1px solid #ddd;
+    }
   </style>
 
 </head>
 <body>
 
+  <!-- بوكس رفع الملفات -->
   <div class="container">
-    <h2>Encrypt File</h2>
+    <h2>Encrypt & Upload File</h2>
 
-    <!-- صندوق الرسائل -->
     <div id="messageBox" class="msgBox"></div>
 
-    <!-- رفع ملف -->
     <input type="file" id="fileInput" />
-
-    <!-- اختيار الموظف المسموح له -->
     <select id="allowedUser">
       <option value="">Select employee allowed to view this file</option>
       <option value="employee1">Employee 1</option>
@@ -98,8 +110,15 @@
       <option value="employee3">Employee 3</option>
     </select>
 
-    <!-- زر التشفير -->
     <button id="encryptBtn">Encrypt & Upload</button>
+  </div>
+
+  <!-- بوكس الملفات المستلمة -->
+  <div class="container">
+    <h2>Received Files</h2>
+    <div id="receivedList" class="received-files">
+      <!-- لاحقًا سيتم إضافة الملفات هنا -->
+    </div>
   </div>
 
   <script>
@@ -124,8 +143,15 @@
         return;
       }
 
-      // لاحقًا نضيف التشفير الحقيقي
+      // لاحقًا نضيف التشفير والرفع
       showMessage("success", "File ready for encryption.");
+
+      // مثال لإضافة الملف للقائمة المستلمة (محاكاة)
+      const receivedList = document.getElementById("receivedList");
+      const div = document.createElement("div");
+      div.className = "file-item";
+      div.textContent = `${file.name} → Allowed for: ${allowed}`;
+      receivedList.appendChild(div);
     });
   </script>
 
