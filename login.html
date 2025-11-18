@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Secure File System - Login</title>
   
-</head>
   <style>
     .login-box {
       width: 300px;
@@ -39,6 +38,7 @@
     .message.error { background: #f8d7da; color: #721c24; }
     .message.success { background: #d4edda; color: #155724; }
   </style>
+</head>
 <body>
 
   <div class="login-box">
@@ -50,7 +50,6 @@
   </div>
 
   <script type="module">
-    // === Supabase setup ===
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/supabase.min.js';
 
     const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
@@ -65,7 +64,6 @@
       msg.style.display = "block";
     }
 
-    // === Login function ===
     async function loginUser() {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
@@ -75,11 +73,15 @@
         return;
       }
 
-      // تسجيل الدخول عبر Supabase Auth
+      console.log("Trying login with:", email);
+
       const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
         email: email,
         password: password
       });
+
+      console.log("Login Data:", loginData);
+      console.log("Login Error:", loginError);
 
       if (loginError) {
         showMessage("Invalid email or password", "error");
@@ -88,14 +90,16 @@
 
       const user = loginData.user;
 
-      // جلب بيانات الـ profile من جدول profiles
+      // جلب بيانات الـ profile
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
 
-      if (profileError) {
+      console.log("Profile Data:", profile, "Profile Error:", profileError);
+
+      if (profileError || !profile) {
         showMessage("Error fetching profile", "error");
         return;
       }
