@@ -6,6 +6,39 @@
   <title>Secure File System - Login</title>
   
 </head>
+  <style>
+    .login-box {
+      width: 300px;
+      margin: 100px auto;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    .login-box input {
+      display: block;
+      width: 100%;
+      margin: 10px 0;
+      padding: 8px;
+    }
+    .login-box button {
+      width: 100%;
+      padding: 10px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .message {
+      display: none;
+      padding: 8px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+    }
+    .message.error { background: #f8d7da; color: #721c24; }
+    .message.success { background: #d4edda; color: #155724; }
+  </style>
 <body>
 
   <div class="login-box">
