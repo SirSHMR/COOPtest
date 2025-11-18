@@ -7,12 +7,9 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
-  <!-- بوكس رفع الملفات -->
   <div class="container">
     <h2>Encrypt & Upload File</h2>
     <div id="messageBox" class="msgBox"></div>
-
     <input type="file" id="fileInput" />
     <select id="allowedUser">
       <option value="">Select employee allowed to view this file</option>
@@ -20,16 +17,14 @@
       <option value="employee2">Employee 2</option>
       <option value="employee3">Employee 3</option>
     </select>
-
     <button id="encryptBtn">Encrypt & Upload</button>
   </div>
 
-  <!-- بوكس الملفات المستلمة -->
   <div class="container">
     <h2>Received Files</h2>
     <div id="receivedList" class="received-files"></div>
   </div>
 
-  <script src="dashboard.js" type="module"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>
