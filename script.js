@@ -1,8 +1,8 @@
-// Supabase setup
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+// Supabase setup - بدون استيراد
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
 
+// استخدم window.supabase بدلاً من الاستيراد
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ========================================
@@ -23,11 +23,6 @@ async function loginUser() {
   const emailInput = document.getElementById("Email");
   const passwordInput = document.getElementById("password");
 
-  if (!emailInput || !passwordInput) {
-    showMessage("Login form elements not found", "error");
-    return;
-  }
-
   const email = emailInput.value.trim();
   const password = passwordInput.value.trim();
 
@@ -38,8 +33,8 @@ async function loginUser() {
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password
+      email: email,
+      password: password
     });
 
     if (error) {
@@ -51,7 +46,6 @@ async function loginUser() {
     if (data.user) {
       showMessage("Login successful! Redirecting...", "success");
       setTimeout(() => {
-        // تأكد من وجود dashboard.html أو غير المسار حسب احتياجك
         window.location.href = "dashboard.html";
       }, 1500);
     }
@@ -64,27 +58,18 @@ async function loginUser() {
 // ========================================
 // Event Listeners
 // ========================================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", function() {
   const loginBtn = document.getElementById("loginBtn");
   if (loginBtn) {
     loginBtn.addEventListener("click", loginUser);
-    
-    // إضافة إمكانية الدخول بالزر Enter
-    const emailInput = document.getElementById("Email");
-    const passwordInput = document.getElementById("password");
-    
-    if (emailInput && passwordInput) {
-      emailInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") loginUser();
-      });
-      passwordInput.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") loginUser();
-      });
-    }
   }
+  
+  // إضافة إمكانية الدخول بالزر Enter
+  document.getElementById("Email").addEventListener("keypress", function(e) {
+    if (e.key === "Enter") loginUser();
+  });
+  
+  document.getElementById("password").addEventListener("keypress", function(e) {
+    if (e.key === "Enter") loginUser();
+  });
 });
-
-// ========================================
-// Export functions for other pages (optional)
-// ========================================
-export { supabase, showMessage };
