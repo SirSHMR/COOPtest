@@ -1,90 +1,91 @@
 // Supabase setup
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.30.0/dist/supabase.min.js';
+
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ========================================
-// Login Function
+// Message Function
 // ========================================
 function showMessage(text, type = "error") {
-  const msg = document.getElementById("message") || document.getElementById("messageBox");
+  const msg = document.getElementById("message");
   if (!msg) return;
   msg.textContent = text;
   msg.className = "message " + type;
   msg.style.display = "block";
 }
 
+// ========================================
+// Login Function
+// ========================================
 async function loginUser() {
-  const emailInput = document.getElementById("Email") || document.getElementById("username");
+  const emailInput = document.getElementById("Email");
   const passwordInput = document.getElementById("password");
 
-  if (!emailInput || !passwordInput) return;
+  if (!emailInput || !passwordInput) {
+    showMessage("Login form elements not found", "error");
+    return;
+  }
 
   const email = emailInput.value.trim();
   const password = passwordInput.value.trim();
 
   if (!email || !password) {
-    showMessage("Please enter both fields", "error");
+    showMessage("Please enter both email and password", "error");
     return;
   }
 
-  const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-    email,
-    password
-  });
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
 
-  if (loginError || !loginData.user) {
-    showMessage("Invalid email or password", "error");
-    return;
+    if (error) {
+      showMessage("Invalid email or password", "error");
+      console.error("Login error:", error.message);
+      return;
+    }
+
+    if (data.user) {
+      showMessage("Login successful! Redirecting...", "success");
+      setTimeout(() => {
+        // تأكد من وجود dashboard.html أو غير المسار حسب احتياجك
+        window.location.href = "dashboard.html";
+      }, 1500);
+    }
+  } catch (error) {
+    showMessage("Network error. Please try again.", "error");
+    console.error("Login exception:", error);
   }
-
-  showMessage("Login successful!", "success");
-  setTimeout(() => window.location.href = "dashboard.html", 800);
 }
 
 // ========================================
-// Dashboard Function
-// ========================================
-function dashboardSetup() {
-  const encryptBtn = document.getElementById("encryptBtn");
-  if (!encryptBtn) return;
-
-  encryptBtn.addEventListener("click", () => {
-    const file = document.getElementById("fileInput").files[0];
-    const allowed = document.getElementById("allowedUser").value;
-
-    if (!file) {
-      showMessage("error", "Please select a file.");
-      return;
-    }
-
-    if (!allowed) {
-      showMessage("error", "Please select an employee who can access the file.");
-      return;
-    }
-
-    showMessage("success", "File ready for encryption.");
-
-    // إضافة الملف للقائمة المستلمة (محاكاة)
-    const receivedList = document.getElementById("receivedList");
-    if (!receivedList) return;
-    const div = document.createElement("div");
-    div.className = "file-item";
-    div.textContent = `${file.name} → Allowed for: ${allowed}`;
-    receivedList.appendChild(div);
-  });
-}
-
-// ========================================
-// تشغيل الوظائف حسب الصفحة
+// Event Listeners
 // ========================================
 document.addEventListener("DOMContentLoaded", () => {
-  if (document.getElementById("loginBtn")) {
-    document.getElementById("loginBtn").addEventListener("click", loginUser);
-  }
-  if (document.getElementById("encryptBtn")) {
-    dashboardSetup();
+  const loginBtn = document.getElementById("loginBtn");
+  if (loginBtn) {
+    loginBtn.addEventListener("click", loginUser);
+    
+    // إضافة إمكانية الدخول بالزر Enter
+    const emailInput = document.getElementById("Email");
+    const passwordInput = document.getElementById("password");
+    
+    if (emailInput && passwordInput) {
+      emailInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") loginUser();
+      });
+      passwordInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") loginUser();
+      });
+    }
   }
 });
+
+// ========================================
+// Export functions for other pages (optional)
+// ========================================
+export { supabase, showMessage };
