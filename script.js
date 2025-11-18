@@ -4,13 +4,13 @@ import { getFirestore, collection, getDocs } from "https://www.gstatic.com/fireb
 
 // إعداد Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyCLdZaRoM241fDHp9f3GlkSY2CiZLzGYZA",
-  authDomain: "coopdatabase-f97ed.firebaseapp.com",
-  projectId: "coopdatabase-f97ed",
-  storageBucket: "coopdatabase-f97ed.firebasestorage.app",
-  messagingSenderId: "220178541017",
-  appId: "1:220178541017:web:9e5bf209aec918a19791c8",
-  measurementId: "G-FTZHG0RRVY"
+  apiKey: "AIzaSyDq9vPArSz4BFN3b0gNvMavSK6OpTQq9_4",
+  authDomain: "cooptesttt.firebaseapp.com",
+  projectId: "cooptesttt",
+  storageBucket: "cooptesttt.firebasestorage.app",
+  messagingSenderId: "994477108284",
+  appId: "1:994477108284:web:943f9ad4c50e49ca15e739",
+  measurementId: "G-VKRBBWZRBY"
 };
 
 // تهيئة التطبيق والاتصال بالقاعدة
