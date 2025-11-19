@@ -16,40 +16,26 @@ function showMessage(text, type = "error") {
   }
 }
 
-// دالة جلب الموظفين من Supabase
+// تحميل قائمة الموظفين من جدول employees
 async function loadEmployees() {
-  try {
-    // احصل على المستخدم الحالي
-    const currentUser = (await supabase.auth.getUser()).data.user;
+  const select = document.getElementById('employeeSelect');
+  select.innerHTML = `<option value="">Select Employee</option>`;
 
-    // اجلب جميع الموظفين من جدول employees
-    const { data: employees, error } = await supabase
-      .from('employees')
-      .select('id, name');
+  const { data, error } = await supabase
+    .from("employees")
+    .select("id, name, email");
 
-    if (error) {
-      console.error('Error loading employees:', error);
-      return;
-    }
-
-    const select = document.getElementById('allowedUser');
-
-    // إفراغ القائمة أولاً
-    select.innerHTML = '<option value="">Select Employee</option>';
-
-    // أضف الموظفين باستثناء المستخدم الحالي
-    employees.forEach(emp => {
-      if (emp.id !== currentUser.id) {   // ← هنا السحر
-        const option = document.createElement('option');
-        option.value = emp.id;
-        option.textContent = emp.name;
-        select.appendChild(option);
-      }
-    });
-
-  } catch (error) {
-    console.error('Error loading employees:', error);
+  if (error) {
+    console.error("Error loading employees:", error);
+    return;
   }
+
+  data.forEach(emp => {
+    const option = document.createElement("option");
+    option.value = emp.id;      
+    option.textContent = emp.name; 
+    select.appendChild(option);
+  });
 }
 
 // إرسال الملف
