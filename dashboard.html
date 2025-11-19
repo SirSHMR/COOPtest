@@ -8,20 +8,19 @@
 </head>
 <body>
   <div class="dashboard-container">
-
+    
     <!-- مربع إرسال الملف -->
     <div class="container">
       <h2>Encrypt & Send File</h2>
-
       <div id="messageBox" class="msgBox"></div>
-
+      
       <input type="file" id="fileInput">
-
-      <label for="allowedUser">Send to Employee:</label>
-      <select id="allowedUser">
+      
+      <label for="employeeSelect">Send to Employee:</label>
+      <select id="employeeSelect">
         <option value="">Select Employee</option>
       </select>
-
+      
       <button id="encryptBtn">Encrypt & Send</button>
     </div>
 
@@ -29,11 +28,12 @@
     <div class="container">
       <h2>Received Documents</h2>
       <div id="receivedList" class="received-files">
-        <!-- الملفات ستظهر هنا -->
+        <!-- سيتم تعبئته -->
       </div>
     </div>
 
     <button id="logoutBtn" style="width: 200px; margin-top: 20px;">Logout</button>
+
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
