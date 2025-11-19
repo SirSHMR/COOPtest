@@ -1,195 +1,159 @@
 // Supabase setup
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// دالة لعرض الرسائل
+// دالة عرض رسالة
 function showMessage(text, type = "error") {
   const msgBox = document.getElementById("messageBox");
   if (!msgBox) return;
-  
+
   msgBox.textContent = text;
-  msgBox.className = `msgBox ${type === 'error' ? 'errorMsg' : 'successMsg'}`;
-  msgBox.style.display = 'block';
-  
-  if (type === 'success') {
+  msgBox.className = `msgBox ${type === "error" ? "errorMsg" : "successMsg"}`;
+  msgBox.style.display = "block";
+
+  if (type === "success") {
     setTimeout(() => {
-      msgBox.style.display = 'none';
+      msgBox.style.display = "none";
     }, 3000);
   }
 }
 
-// دالة جلب الموظفين من Supabase
+// تحميل الموظفين من جدول employees
 async function loadEmployees() {
-  try {
-    const { data: users, error } = await supabase.auth.admin.listUsers();
-    
-    if (error) {
-      console.error('Error loading employees:', error);
-      return;
-    }
+  const { data, error } = await supabase.from("employees").select("*");
 
-    const select = document.getElementById('allowedUser');
-    
-    // إفراغ القائمة أولاً
-    select.innerHTML = '<option value="">Select Employee</option>';
-    
-    // إضافة الموظفين للقائمة
-    users.users.forEach(user => {
-      if (user.email) {
-        const option = document.createElement('option');
-        option.value = user.id;
-        option.textContent = user.email;
-        select.appendChild(option);
-      }
-    });
-    
-  } catch (error) {
-    console.error('Error loading employees:', error);
+  if (error) {
+    console.error("Error loading employees:", error);
+    return;
   }
+
+  const select = document.getElementById("allowedUser");
+  select.innerHTML = '<option value="">Select Employee</option>';
+
+  data.forEach((emp) => {
+    const option = document.createElement("option");
+    option.value = emp.user_id; // UID من Supabase Auth
+    option.textContent = emp.name; // فقط الاسم كما طلبت
+    select.appendChild(option);
+  });
 }
 
-// دالة تشفير وإرسال الملف
+// تشفير وهمي + إرسال (رفع)
 async function encryptAndSendFile() {
-  const fileInput = document.getElementById('fileInput');
-  const allowedUserSelect = document.getElementById('allowedUser');
-  
+  const fileInput = document.getElementById("fileInput");
+  const allowedUser = document.getElementById("allowedUser").value;
+
   const file = fileInput.files[0];
-  const allowedUserId = allowedUserSelect.value;
 
-  if (!file) {
-    showMessage('Please select a file', 'error');
+  if (!file) return showMessage("Please select a file", "error");
+  if (!allowedUser) return showMessage("Please select an employee", "error");
+
+  // اسم فريد للملف
+  const fileName = `${Date.now()}_${file.name}`;
+
+  // رفع الملف إلى Storage bucket اسمه: files
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from("files")
+    .upload(fileName, file);
+
+  if (uploadError) {
+    showMessage("Upload Failed: " + uploadError.message, "error");
     return;
   }
 
-  if (!allowedUserId) {
-    showMessage('Please select an employee', 'error');
+  // الحصول على المستخدم الحالي
+  const currentUser = (await supabase.auth.getUser()).data.user;
+
+  // حفظ البيانات في shared_files
+  const { error: insertError } = await supabase.from("shared_files").insert([
+    {
+      file_name: file.name,
+      storage_path: uploadData.path,
+      allowed_user_id: allowedUser,
+      uploaded_by: currentUser.id,
+      created_at: new Date(),
+    },
+  ]);
+
+  if (insertError) {
+    showMessage("Database Error: " + insertError.message, "error");
     return;
   }
 
-  try {
-    // رفع الملف إلى Supabase Storage
-    const fileName = `${Date.now()}_${file.name}`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('files') // تأكد من أن هذا الـ bucket موجود في Supabase
-      .upload(fileName, file);
-
-    if (uploadError) {
-      showMessage('Error uploading file: ' + uploadError.message, 'error');
-      return;
-    }
-
-    // حفظ معلومات الملف في قاعدة البيانات
-    const { data: fileData, error: dbError } = await supabase
-      .from('shared_files') // تأكد من أن هذه الجدول موجود
-      .insert([
-        {
-          file_name: file.name,
-          storage_path: uploadData.path,
-          allowed_user_id: allowedUserId,
-          uploaded_by: (await supabase.auth.getUser()).data.user.id,
-          created_at: new Date()
-        }
-      ]);
-
-    if (dbError) {
-      showMessage('Error saving file info: ' + dbError.message, 'error');
-      return;
-    }
-
-    showMessage('File sent successfully!', 'success');
-    fileInput.value = ''; // مسح حقل الملف
-    
-  } catch (error) {
-    showMessage('Error: ' + error.message, 'error');
-  }
+  showMessage("File sent successfully!", "success");
+  fileInput.value = "";
 }
 
-// دالة جلب الملفات المستلمة
+// تحميل الملفات المستلمة للموظف الحالي
 async function loadReceivedFiles() {
-  try {
-    const currentUser = (await supabase.auth.getUser()).data.user;
-    
-    const { data: files, error } = await supabase
-      .from('shared_files')
-      .select('*')
-      .eq('allowed_user_id', currentUser.id);
+  const currentUser = (await supabase.auth.getUser()).data.user;
 
-    if (error) {
-      console.error('Error loading files:', error);
-      return;
-    }
+  const { data: files, error } = await supabase
+    .from("shared_files")
+    .select("*")
+    .eq("allowed_user_id", currentUser.id);
 
-    const receivedList = document.getElementById('receivedList');
-    receivedList.innerHTML = '';
+  const receivedList = document.getElementById("receivedList");
+  receivedList.innerHTML = "";
 
-    if (files.length === 0) {
-      receivedList.innerHTML = '<p>No files received yet.</p>';
-      return;
-    }
-
-    files.forEach(file => {
-      const fileItem = document.createElement('div');
-      fileItem.className = 'file-item';
-      fileItem.innerHTML = `
-        <strong>${file.file_name}</strong><br>
-        <small>Received: ${new Date(file.created_at).toLocaleDateString()}</small>
-        <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')" style="margin-top: 5px;">Download</button>
-      `;
-      receivedList.appendChild(fileItem);
-    });
-
-  } catch (error) {
-    console.error('Error loading received files:', error);
+  if (!files || files.length === 0) {
+    receivedList.innerHTML = "<p>No files received yet.</p>";
+    return;
   }
+
+  files.forEach((file) => {
+    const div = document.createElement("div");
+    div.className = "file-item";
+    div.innerHTML = `
+      <strong>${file.file_name}</strong><br>
+      <small>${new Date(file.created_at).toLocaleDateString()}</small><br>
+      <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
+    `;
+    receivedList.appendChild(div);
+  });
 }
 
-// دالة تحميل الملف
+// تحميل ملف من Supabase Storage
 async function downloadFile(storagePath, fileName) {
-  try {
-    const { data, error } = await supabase.storage
-      .from('files')
-      .download(storagePath);
+  const { data, error } = await supabase.storage
+    .from("files")
+    .download(storagePath);
 
-    if (error) {
-      showMessage('Error downloading file: ' + error.message, 'error');
-      return;
-    }
-
-    // إنشاء رابط تحميل
-    const url = URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-  } catch (error) {
-    showMessage('Error downloading file: ' + error.message, 'error');
+  if (error) {
+    showMessage("Download Failed: " + error.message, "error");
+    return;
   }
+
+  const url = URL.createObjectURL(data);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
-// دالة تسجيل الخروج
+// تسجيل خروج
 async function logout() {
   await supabase.auth.signOut();
-  window.location.href = 'index.html';
+  window.location.href = "index.html";
 }
 
-// تهيئة الصفحة
-document.addEventListener('DOMContentLoaded', async function() {
-  // تحميل قائمة الموظفين
+// تشغيل عند تحميل الصفحة
+document.addEventListener("DOMContentLoaded", async () => {
   await loadEmployees();
-  
-  // تحميل الملفات المستلمة
   await loadReceivedFiles();
-  
-  // إضافة event listeners
-  document.getElementById('encryptBtn').addEventListener('click', encryptAndSendFile);
-  document.getElementById('logoutBtn').addEventListener('click', logout);
+
+  document
+    .getElementById("encryptBtn")
+    .addEventListener("click", encryptAndSendFile);
+
+  document.getElementById("logoutBtn").addEventListener("click", logout);
 });
 
-// جعل الدوال متاحة globally للاستخدام في الأحداث
+// جعل الدوال متاحة
 window.downloadFile = downloadFile;
