@@ -11,6 +11,7 @@ body {
 }
 
 /* Login Box */
+/* Login Box */
 .login-box {
   background: white;
   padding: 40px;
@@ -18,6 +19,7 @@ body {
   box-shadow: 0 0 15px rgba(0,0,0,0.1);
   width: 320px;
   text-align: center;
+  margin-top: -100px; /* هذا السطر يرفع البوكس لأعلى */
 }
 
 .login-box input {
