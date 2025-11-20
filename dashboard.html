@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -8,35 +9,40 @@
 </head>
 <body>
   <div class="dashboard-container">
-    
-    <!-- مربع إرسال الملف -->
-    <div class="container">
-      <h2>Encrypt & Send File</h2>
-      <div id="messageBox" class="msgBox"></div>
-      
-      <input type="file" id="fileInput">
-      
-      <label for="employeeSelect">Send to Employee:</label>
-      <select id="employeeSelect">
-        <option value="">Select Employee</option>
-      </select>
-      
-      <button id="encryptBtn">Encrypt & Send</button>
-    </div>
 
-    <!-- مربع المستندات المستلمة -->
-    <div class="container">
-      <h2>Received Documents</h2>
-      <div id="receivedList" class="received-files">
-        <!-- سيتم تعبئته -->
-      </div>
-    </div>
+```
+<!-- مربع إرسال الملف -->
+<div class="container">
+  <h2>Encrypt & Send File</h2>
+  <div id="messageBox" class="msgBox"></div>
+  
+  <input type="file" id="fileInput">
 
-    <button id="logoutBtn" style="width: 200px; margin-top: 20px;">Logout</button>
+  <label for="employeesList">Send to:</label>
+  <!-- إٔنشاء قائمة checkboxes للموظفين -->
+  <div id="employeesList" style="text-align: left; max-height: 220px; overflow:auto; padding: 8px; border-radius:8px; border:1px solid #eee; background:#fff;">
+    <!-- سيتم تعبئتها ديناميكيًا بجافاسكربت -->
+  </div>
+
+  <button id="encryptBtn" style="margin-top:12px;">Encrypt & Send</button>
+</div>
+
+<!-- مربع المستندات المستلمة -->
+<div class="container">
+  <h2>Received Documents</h2>
+  <div id="receivedList" class="received-files">
+    <!-- سيتم تعبئته -->
+  </div>
+</div>
+
+<button id="logoutBtn" style="width: 200px; margin-top: 20px;">Logout</button>
+```
 
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script src="dashboard.js"></script>
+
 </body>
 </html>
