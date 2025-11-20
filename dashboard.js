@@ -4,7 +4,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// رسائل
+// Messages
 function showMessage(text, type = "error") {
   const msgBox = document.getElementById("messageBox");
   msgBox.textContent = text;
@@ -16,10 +16,10 @@ function showMessage(text, type = "error") {
   }
 }
 
-// تحميل قائمة الموظفين من جدول employees
+// Load employees list from employees table
 async function loadEmployees() {
-  const select = document.getElementById('employeeSelect');
-  select.innerHTML = `<option value="">Select Employee</option>`;
+  const employeesList = document.getElementById('employeesList');
+  employeesList.innerHTML = '';
 
   const { data, error } = await supabase
     .from("employees")
@@ -31,28 +31,48 @@ async function loadEmployees() {
   }
 
   data.forEach(emp => {
-    const option = document.createElement("option");
-    option.value = emp.id;      
-    option.textContent = emp.name; 
-    select.appendChild(option);
+    const div = document.createElement("div");
+    div.className = "employee-checkbox";
+    div.innerHTML = `
+      <label>
+        <input type="checkbox" class="employee-checkbox" value="${emp.id}">
+        ${emp.name} (${emp.email})
+      </label>
+    `;
+    employeesList.appendChild(div);
   });
 }
 
-// إرسال الملف
+// Get selected employees
+function getSelectedEmployees() {
+  const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
+  const selectedEmployees = [];
+  
+  checkboxes.forEach(checkbox => {
+    if (checkbox.checked) {
+      selectedEmployees.push(checkbox.value);
+    }
+  });
+  
+  return selectedEmployees;
+}
+
+// Send file
 async function encryptAndSendFile() {
   const fileInput = document.getElementById('fileInput');
-  const employeeSelect = document.getElementById('employeeSelect');
-
+  const selectAllCheckbox = document.getElementById('selectAllEmployees');
+  
   const file = fileInput.files[0];
-  const allowedUserId = employeeSelect.value;
+  const sendToAll = selectAllCheckbox.checked;
+  const selectedEmployees = getSelectedEmployees();
 
   if (!file) return showMessage("Please select a file");
-  if (!allowedUserId) return showMessage("Please select an employee");
+  if (!sendToAll && selectedEmployees.length === 0) return showMessage("Please select at least one employee");
 
   try {
     const fileName = `${Date.now()}_${file.name}`;
 
-    // رفع الملف
+    // Upload file
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("files")
       .upload(fileName, file);
@@ -62,35 +82,58 @@ async function encryptAndSendFile() {
       return;
     }
 
-    // حفظ البيانات في shared_files
+    // Get all employees if "Send to All" is selected
+    let employeeIds = [];
+    if (sendToAll) {
+      const { data: allEmployees, error: empError } = await supabase
+        .from("employees")
+        .select("id");
+      
+      if (empError) {
+        showMessage("Error fetching employees: " + empError.message);
+        return;
+      }
+      
+      employeeIds = allEmployees.map(emp => emp.id);
+    } else {
+      employeeIds = selectedEmployees;
+    }
+
+    // Save data in shared_files for each employee
     const currentUser = (await supabase.auth.getUser()).data.user.id;
+    const fileRecords = employeeIds.map(employeeId => ({
+      file_name: file.name,
+      storage_path: uploadData.path,
+      allowed_user_id: employeeId,
+      uploaded_by: currentUser,
+      created_at: new Date(),
+    }));
 
     const { error: dbError } = await supabase
       .from("shared_files")
-      .insert([
-        {
-          file_name: file.name,
-          storage_path: uploadData.path,
-          allowed_user_id: allowedUserId,
-          uploaded_by: currentUser,
-          created_at: new Date(),
-        },
-      ]);
+      .insert(fileRecords);
 
     if (dbError) {
-      showMessage("DB error: " + dbError.message);
+      showMessage("Database error: " + dbError.message);
       return;
     }
 
-    showMessage("File sent successfully!", "success");
+    showMessage(`File sent successfully to ${employeeIds.length} employee(s)!`, "success");
     fileInput.value = "";
+    
+    // Reset options
+    selectAllCheckbox.checked = false;
+    const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = false;
+    });
   } 
   catch (err) {
     showMessage(err.message);
   }
 }
 
-// تحميل الملفات المستلمة
+// Load received files
 async function loadReceivedFiles() {
   const currentUser = (await supabase.auth.getUser()).data.user;
 
@@ -119,7 +162,7 @@ async function loadReceivedFiles() {
   });
 }
 
-// تحميل ملف
+// Download file
 async function downloadFile(path, fileName) {
   const { data, error } = await supabase.storage
     .from("files")
@@ -140,20 +183,29 @@ async function downloadFile(path, fileName) {
   URL.revokeObjectURL(url);
 }
 
-// تسجيل خروج
+// Logout
 async function logout() {
   await supabase.auth.signOut();
   window.location.href = "index.html";
 }
 
-// عند تحميل الصفحة
+// On page load
 document.addEventListener("DOMContentLoaded", async () => {
   await loadEmployees();
   await loadReceivedFiles();
 
   document.getElementById("encryptBtn").addEventListener("click", encryptAndSendFile);
   document.getElementById("logoutBtn").addEventListener("click", logout);
+  
+  // Add event for "Send to All Employees" option
+  document.getElementById("selectAllEmployees").addEventListener("change", function() {
+    const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+      checkbox.checked = this.checked;
+      checkbox.disabled = this.checked;
+    });
+  });
 });
 
-// لجعل الدوال متاحة للزر
+// Make functions available for button
 window.downloadFile = downloadFile;
