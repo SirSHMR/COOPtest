@@ -19,7 +19,7 @@ body {
   box-shadow: 0 0 15px rgba(0,0,0,0.1);
   width: 320px;
   text-align: center;
-  margin-top: -100px; /* هذا السطر يرفع البوكس لأعلى */
+  margin-top: -100px; 
 }
 
 .login-box input {
