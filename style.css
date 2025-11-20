@@ -3,13 +3,56 @@ body {
   font-family: Poppins, sans-serif;
   background: #f2f5f9;
   margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Login Box */
+.login-box {
+  background: white;
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  width: 320px;
+  text-align: center;
+}
+
+.login-box input {
+  width: 100%;
+  padding: 12px;
+  margin: 10px 0;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  box-sizing: border-box;
+  font-family: Poppins, sans-serif;
+}
+
+.login-box button {
+  width: 100%;
+  padding: 12px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: bold;
+  font-family: Poppins, sans-serif;
+  margin-top: 10px;
+}
+
+.login-box button:hover {
+  background: #0056b3;
 }
 
 /* Dashboard Container */
 .dashboard-container {
+  width: 100%;
   max-width: 500px;
-  margin: 50px auto;
   padding: 20px;
+  box-sizing: border-box;
 }
 
 /* Container */
@@ -20,18 +63,38 @@ body {
   box-shadow: 0 0 15px rgba(0,0,0,0.1);
   text-align: center;
   margin-bottom: 30px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-input[type="file"] {
+.container h2 {
+  margin-top: 0;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.container label {
+  display: block;
+  text-align: left;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* Input and Select Styles */
+input[type="file"],
+select {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   margin: 10px 0 15px;
   border-radius: 10px;
   border: 1px solid #ccc;
+  box-sizing: border-box;
+  font-family: Poppins, sans-serif;
 }
 
+/* Button Styles */
 button {
-  width: 100%;
   padding: 12px;
   background-color: #007bff;
   border: none;
@@ -39,10 +102,35 @@ button {
   border-radius: 10px;
   cursor: pointer;
   font-weight: bold;
+  font-family: Poppins, sans-serif;
+  margin-top: 10px;
 }
 
 button:hover {
   background-color: #0056b3;
+}
+
+/* Message Styles */
+.message {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  text-align: center;
+  display: none;
+  font-weight: 500;
+}
+
+.message.error {
+  background: #ffdddd;
+  color: #d60000;
+  border-left: 5px solid #d60000;
+}
+
+.message.success {
+  background: #ddffdd;
+  color: #0c8b0c;
+  border-left: 5px solid #0c8b0c;
 }
 
 .msgBox {
@@ -66,20 +154,38 @@ button:hover {
   border-left: 5px solid #0c8b0c;
 }
 
+/* Received Files */
 .received-files {
   margin-top: 20px;
   text-align: left;
 }
 
 .file-item {
-  padding: 10px;
+  padding: 15px;
   margin-bottom: 10px;
   border-radius: 10px;
   background: #f7f7f7;
   border: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-/* Employees list styles */
+.file-item strong {
+  color: #333;
+}
+
+.file-item small {
+  color: #666;
+}
+
+.file-item button {
+  width: auto;
+  padding: 8px 15px;
+  margin: 0;
+}
+
+/* Employees List Styles */
 .employees-list {
   max-height: 200px;
   overflow-y: auto;
@@ -92,8 +198,13 @@ button:hover {
 }
 
 .employee-checkbox {
-  padding: 8px 5px;
+  padding: 10px 8px;
   border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.employee-checkbox:hover {
+  background-color: #f8f9fa;
 }
 
 .employee-checkbox:last-child {
@@ -105,15 +216,24 @@ button:hover {
   align-items: center;
   cursor: pointer;
   font-size: 14px;
+  margin: 0;
+  font-weight: normal;
 }
 
 .employee-checkbox input[type="checkbox"] {
-  margin-right: 10px;
+  margin-right: 12px;
+  transform: scale(1.1);
 }
 
+.employee-checkbox input[type="checkbox"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Select All Container */
 .select-all-container {
-  margin-bottom: 10px;
-  padding: 10px;
+  margin-bottom: 15px;
+  padding: 12px;
   background-color: #f8f9fa;
   border-radius: 10px;
   border: 1px solid #e9ecef;
@@ -125,17 +245,44 @@ button:hover {
   font-weight: bold;
   cursor: pointer;
   font-size: 14px;
+  margin: 0;
+  color: #333;
 }
 
 .select-all-container input[type="checkbox"] {
-  margin-right: 10px;
+  margin-right: 12px;
+  transform: scale(1.1);
 }
 
-/* Logout button specific style */
+/* Logout Button */
 #logoutBtn {
   width: 200px;
   margin-top: 20px;
   display: block;
   margin-left: auto;
   margin-right: auto;
+  background-color: #6c757d;
+}
+
+#logoutBtn:hover {
+  background-color: #5a6268;
+}
+
+/* Scrollbar Styling */
+.employees-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.employees-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.employees-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.employees-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
