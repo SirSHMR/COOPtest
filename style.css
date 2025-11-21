@@ -11,7 +11,6 @@ body {
 }
 
 /* Login Box */
-/* Login Box */
 .login-box {
   background: white;
   padding: 40px;
@@ -19,7 +18,7 @@ body {
   box-shadow: 0 0 15px rgba(0,0,0,0.1);
   width: 320px;
   text-align: center;
-  margin-top: -100px; 
+  margin-top: -100px;
 }
 
 .login-box input {
@@ -47,6 +46,28 @@ body {
 
 .login-box button:hover {
   background: #0056b3;
+}
+
+.message {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  text-align: center;
+  display: none;
+  font-weight: 500;
+}
+
+.message.error {
+  background: #ffdddd;
+  color: #d60000;
+  border-left: 5px solid #d60000;
+}
+
+.message.success {
+  background: #ddffdd;
+  color: #0c8b0c;
+  border-left: 5px solid #0c8b0c;
 }
 
 /* Dashboard Container */
@@ -84,8 +105,7 @@ body {
 }
 
 /* Input and Select Styles */
-input[type="file"],
-select {
+input[type="file"] {
   width: 100%;
   padding: 12px;
   margin: 10px 0 15px;
@@ -113,28 +133,6 @@ button:hover {
 }
 
 /* Message Styles */
-.message {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 10px;
-  font-size: 14px;
-  text-align: center;
-  display: none;
-  font-weight: 500;
-}
-
-.message.error {
-  background: #ffdddd;
-  color: #d60000;
-  border-left: 5px solid #d60000;
-}
-
-.message.success {
-  background: #ddffdd;
-  color: #0c8b0c;
-  border-left: 5px solid #0c8b0c;
-}
-
 .msgBox {
   margin-bottom: 15px;
   padding: 12px;
@@ -287,4 +285,12 @@ button:hover {
 
 .employees-list::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* Headers in received files */
+.received-files h3 {
+  margin: 0 0 15px 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #007bff;
+  font-size: 18px;
 }
