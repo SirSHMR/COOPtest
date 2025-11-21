@@ -194,6 +194,7 @@ async function encryptAndSendFile() {
 }
 
 // Load received files
+// Load received files - UPDATED without relationship
 async function loadReceivedFiles() {
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -207,10 +208,10 @@ async function loadReceivedFiles() {
 
     console.log("Loading files for user:", currentUser.id);
 
-    // Get files where current user is either recipient or sender
+    // جلب الملفات المرسلة إليه أو التي أرسلها بدون علاقة
     const { data: files, error } = await supabase
       .from("shared_files")
-      .select("*, employees(name)")
+      .select("*")
       .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
       .order('created_at', { ascending: false });
 
@@ -230,7 +231,19 @@ async function loadReceivedFiles() {
       return;
     }
 
-    // Separate received files from sent files
+    // جلب أسماء الموظفين بشكل منفصل
+    const { data: employees } = await supabase
+      .from("employees")
+      .select("id, name");
+
+    const employeeMap = {};
+    if (employees) {
+      employees.forEach(emp => {
+        employeeMap[emp.id] = emp.name;
+      });
+    }
+
+    // فصل الملفات المستلمة عن الملفات المرسلة
     const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
     const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
 
@@ -263,12 +276,13 @@ async function loadReceivedFiles() {
       receivedList.appendChild(sentHeader);
 
       sentFiles.forEach(file => {
+        const employeeName = employeeMap[file.allowed_user_id] || 'Employee';
         const div = document.createElement("div");
         div.className = "file-item";
         div.innerHTML = `
           <div>
             <strong>${file.file_name}</strong><br />
-            <small>Sent to: ${file.employees?.name || 'Employee'} • ${new Date(file.created_at).toLocaleDateString()}</small>
+            <small>Sent to: ${employeeName} • ${new Date(file.created_at).toLocaleDateString()}</small>
           </div>
           <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
