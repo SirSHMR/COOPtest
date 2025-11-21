@@ -27,6 +27,12 @@ async function loadEmployees() {
 
   if (error) {
     console.error("Error loading employees:", error);
+    showMessage("Error loading employees list: " + error.message);
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    employeesList.innerHTML = '<p>No employees found</p>';
     return;
   }
 
@@ -72,15 +78,25 @@ async function encryptAndSendFile() {
   try {
     const fileName = `${Date.now()}_${file.name}`;
 
-    // Upload file
+    // Upload file to storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("files")
       .upload(fileName, file);
 
     if (uploadError) {
+      console.error("Upload error:", uploadError);
       showMessage("Upload error: " + uploadError.message);
       return;
     }
+
+    // Get current user
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) {
+      showMessage("Authentication error: " + userError.message);
+      return;
+    }
+
+    const currentUser = userData.user.id;
 
     // Get all employees if "Send to All" is selected
     let employeeIds = [];
@@ -99,22 +115,26 @@ async function encryptAndSendFile() {
       employeeIds = selectedEmployees;
     }
 
-    // Save data in shared_files for each employee
-    const currentUser = (await supabase.auth.getUser()).data.user.id;
+    // Prepare file records for insertion
     const fileRecords = employeeIds.map(employeeId => ({
       file_name: file.name,
       storage_path: uploadData.path,
       allowed_user_id: employeeId,
       uploaded_by: currentUser,
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
     }));
 
+    // Insert records into shared_files table
     const { error: dbError } = await supabase
       .from("shared_files")
       .insert(fileRecords);
 
     if (dbError) {
+      console.error("Database error:", dbError);
       showMessage("Database error: " + dbError.message);
+      
+      // Try to delete the uploaded file if DB insertion fails
+      await supabase.storage.from("files").remove([uploadData.path]);
       return;
     }
 
@@ -126,24 +146,42 @@ async function encryptAndSendFile() {
     const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
     checkboxes.forEach(checkbox => {
       checkbox.checked = false;
+      checkbox.disabled = false;
     });
+
+    // Reload received files
+    await loadReceivedFiles();
   } 
   catch (err) {
-    showMessage(err.message);
+    console.error("Unexpected error:", err);
+    showMessage("Unexpected error: " + err.message);
   }
 }
 
 // Load received files
 async function loadReceivedFiles() {
-  const currentUser = (await supabase.auth.getUser()).data.user;
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError) {
+    console.error("Auth error:", userError);
+    return;
+  }
+
+  const currentUser = userData.user;
 
   const { data: files, error } = await supabase
     .from("shared_files")
     .select("*")
-    .eq("allowed_user_id", currentUser.id);
+    .eq("allowed_user_id", currentUser.id)
+    .order('created_at', { ascending: false });
 
   const receivedList = document.getElementById("receivedList");
   receivedList.innerHTML = "";
+
+  if (error) {
+    console.error("Error loading files:", error);
+    receivedList.innerHTML = "<p>Error loading files</p>";
+    return;
+  }
 
   if (!files || files.length === 0) {
     receivedList.innerHTML = "<p>No files received yet.</p>";
@@ -154,8 +192,10 @@ async function loadReceivedFiles() {
     const div = document.createElement("div");
     div.className = "file-item";
     div.innerHTML = `
-      <strong>${file.file_name}</strong><br />
-      <small>${new Date(file.created_at).toLocaleDateString()}</small>
+      <div>
+        <strong>${file.file_name}</strong><br />
+        <small>Received: ${new Date(file.created_at).toLocaleDateString()}</small>
+      </div>
       <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
     `;
     receivedList.appendChild(div);
@@ -164,23 +204,27 @@ async function loadReceivedFiles() {
 
 // Download file
 async function downloadFile(path, fileName) {
-  const { data, error } = await supabase.storage
-    .from("files")
-    .download(path);
+  try {
+    const { data, error } = await supabase.storage
+      .from("files")
+      .download(path);
 
-  if (error) {
-    showMessage("Error downloading file: " + error.message);
-    return;
+    if (error) {
+      showMessage("Error downloading file: " + error.message);
+      return;
+    }
+
+    const url = URL.createObjectURL(data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showMessage("Download error: " + err.message);
   }
-
-  const url = URL.createObjectURL(data);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 // Logout
@@ -191,20 +235,32 @@ async function logout() {
 
 // On page load
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadEmployees();
-  await loadReceivedFiles();
+  try {
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      window.location.href = "index.html";
+      return;
+    }
 
-  document.getElementById("encryptBtn").addEventListener("click", encryptAndSendFile);
-  document.getElementById("logoutBtn").addEventListener("click", logout);
-  
-  // Add event for "Send to All Employees" option
-  document.getElementById("selectAllEmployees").addEventListener("change", function() {
-    const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-      checkbox.checked = this.checked;
-      checkbox.disabled = this.checked;
+    await loadEmployees();
+    await loadReceivedFiles();
+
+    document.getElementById("encryptBtn").addEventListener("click", encryptAndSendFile);
+    document.getElementById("logoutBtn").addEventListener("click", logout);
+    
+    // Add event for "Send to All Employees" option
+    document.getElementById("selectAllEmployees").addEventListener("change", function() {
+      const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
+      checkboxes.forEach(checkbox => {
+        checkbox.checked = this.checked;
+        checkbox.disabled = this.checked;
+      });
     });
-  });
+  } catch (error) {
+    console.error("Initialization error:", error);
+    showMessage("Error initializing dashboard");
+  }
 });
 
 // Make functions available for button
