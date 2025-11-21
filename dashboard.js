@@ -63,6 +63,30 @@ function getSelectedEmployees() {
   return selectedEmployees;
 }
 
+// Check storage permissions
+async function checkStoragePermissions() {
+  try {
+    const testBlob = new Blob(['test'], { type: 'text/plain' });
+    const testFileName = `test_${Date.now()}.txt`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('files')
+      .upload(testFileName, testBlob);
+    
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError);
+      return false;
+    }
+    
+    await supabase.storage.from('files').remove([testFileName]);
+    return true;
+    
+  } catch (error) {
+    console.error('Storage test failed:', error);
+    return false;
+  }
+}
+
 // Send file
 async function encryptAndSendFile() {
   const fileInput = document.getElementById('fileInput');
@@ -76,6 +100,19 @@ async function encryptAndSendFile() {
   if (!sendToAll && selectedEmployees.length === 0) return showMessage("Please select at least one employee");
 
   try {
+    // Check storage permissions first
+    const hasStorageAccess = await checkStoragePermissions();
+    if (!hasStorageAccess) {
+      showMessage("Storage permissions issue. Please check bucket policies.");
+      return;
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      showMessage("Please login again");
+      return;
+    }
+
     const fileName = `${Date.now()}_${file.name}`;
 
     // Upload file to storage
@@ -89,14 +126,7 @@ async function encryptAndSendFile() {
       return;
     }
 
-    // Get current user
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) {
-      showMessage("Authentication error: " + userError.message);
-      return;
-    }
-
-    const currentUser = userData.user.id;
+    console.log("File uploaded:", uploadData);
 
     // Get all employees if "Send to All" is selected
     let employeeIds = [];
@@ -115,7 +145,8 @@ async function encryptAndSendFile() {
       employeeIds = selectedEmployees;
     }
 
-    // Prepare file records for insertion
+    // Save data in shared_files for each employee
+    const currentUser = user.id;
     const fileRecords = employeeIds.map(employeeId => ({
       file_name: file.name,
       storage_path: uploadData.path,
@@ -138,6 +169,8 @@ async function encryptAndSendFile() {
       return;
     }
 
+    console.log("File records inserted for employees:", employeeIds);
+
     showMessage(`File sent successfully to ${employeeIds.length} employee(s)!`, "success");
     fileInput.value = "";
     
@@ -150,7 +183,9 @@ async function encryptAndSendFile() {
     });
 
     // Reload received files
-    await loadReceivedFiles();
+    setTimeout(() => {
+      loadReceivedFiles();
+    }, 1000);
   } 
   catch (err) {
     console.error("Unexpected error:", err);
@@ -160,46 +195,91 @@ async function encryptAndSendFile() {
 
 // Load received files
 async function loadReceivedFiles() {
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) {
-    console.error("Auth error:", userError);
-    return;
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) {
+      console.error("Auth error:", userError);
+      showMessage("Please login again");
+      return;
+    }
+
+    const currentUser = userData.user;
+
+    console.log("Loading files for user:", currentUser.id);
+
+    // Get files where current user is either recipient or sender
+    const { data: files, error } = await supabase
+      .from("shared_files")
+      .select("*, employees(name)")
+      .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error loading files:", error);
+      showMessage("Error loading files: " + error.message);
+      return;
+    }
+
+    console.log("Files loaded:", files);
+
+    const receivedList = document.getElementById("receivedList");
+    receivedList.innerHTML = "";
+
+    if (!files || files.length === 0) {
+      receivedList.innerHTML = "<p>No files received yet.</p>";
+      return;
+    }
+
+    // Separate received files from sent files
+    const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
+    const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
+
+    if (receivedFiles.length > 0) {
+      const receivedHeader = document.createElement("h3");
+      receivedHeader.textContent = "Received Files";
+      receivedHeader.style.marginTop = "20px";
+      receivedHeader.style.color = "#333";
+      receivedList.appendChild(receivedHeader);
+
+      receivedFiles.forEach(file => {
+        const div = document.createElement("div");
+        div.className = "file-item";
+        div.innerHTML = `
+          <div>
+            <strong>${file.file_name}</strong><br />
+            <small>Received: ${new Date(file.created_at).toLocaleDateString()}</small>
+          </div>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
+        `;
+        receivedList.appendChild(div);
+      });
+    }
+
+    if (sentFiles.length > 0) {
+      const sentHeader = document.createElement("h3");
+      sentHeader.textContent = "Sent Files";
+      sentHeader.style.marginTop = "20px";
+      sentHeader.style.color = "#333";
+      receivedList.appendChild(sentHeader);
+
+      sentFiles.forEach(file => {
+        const div = document.createElement("div");
+        div.className = "file-item";
+        div.innerHTML = `
+          <div>
+            <strong>${file.file_name}</strong><br />
+            <small>Sent to: ${file.employees?.name || 'Employee'} • ${new Date(file.created_at).toLocaleDateString()}</small>
+          </div>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
+        `;
+        receivedList.appendChild(div);
+      });
+    }
+
+  } catch (err) {
+    console.error("Unexpected error in loadReceivedFiles:", err);
+    showMessage("Error loading files");
   }
-
-  const currentUser = userData.user;
-
-  const { data: files, error } = await supabase
-    .from("shared_files")
-    .select("*")
-    .eq("allowed_user_id", currentUser.id)
-    .order('created_at', { ascending: false });
-
-  const receivedList = document.getElementById("receivedList");
-  receivedList.innerHTML = "";
-
-  if (error) {
-    console.error("Error loading files:", error);
-    receivedList.innerHTML = "<p>Error loading files</p>";
-    return;
-  }
-
-  if (!files || files.length === 0) {
-    receivedList.innerHTML = "<p>No files received yet.</p>";
-    return;
-  }
-
-  files.forEach(file => {
-    const div = document.createElement("div");
-    div.className = "file-item";
-    div.innerHTML = `
-      <div>
-        <strong>${file.file_name}</strong><br />
-        <small>Received: ${new Date(file.created_at).toLocaleDateString()}</small>
-      </div>
-      <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
-    `;
-    receivedList.appendChild(div);
-  });
 }
 
 // Download file
@@ -227,6 +307,44 @@ async function downloadFile(path, fileName) {
   }
 }
 
+// Debug data function
+async function debugData() {
+  try {
+    const { data: userData } = await supabase.auth.getUser();
+    const currentUser = userData.user;
+    
+    console.log("=== DEBUG INFORMATION ===");
+    console.log("Current user ID:", currentUser.id);
+    console.log("Current user email:", currentUser.email);
+    
+    // Check all files in database
+    const { data: allFiles } = await supabase
+      .from("shared_files")
+      .select("*");
+    console.log("All files in database:", allFiles);
+    
+    // Check files for current user
+    const { data: userFiles } = await supabase
+      .from("shared_files")
+      .select("*")
+      .eq("allowed_user_id", currentUser.id);
+    console.log("Files for current user:", userFiles);
+    
+    // Check employees
+    const { data: employees } = await supabase
+      .from("employees")
+      .select("id, name, email");
+    console.log("All employees:", employees);
+    
+    console.log("=== END DEBUG ===");
+    showMessage("Debug data logged to console", "success");
+    
+  } catch (error) {
+    console.error("Debug error:", error);
+    showMessage("Debug failed: " + error.message);
+  }
+}
+
 // Logout
 async function logout() {
   await supabase.auth.signOut();
@@ -243,9 +361,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
+    console.log("User authenticated:", user.email);
+
     await loadEmployees();
     await loadReceivedFiles();
 
+    // Add event listeners
     document.getElementById("encryptBtn").addEventListener("click", encryptAndSendFile);
     document.getElementById("logoutBtn").addEventListener("click", logout);
     
@@ -257,11 +378,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         checkbox.disabled = this.checked;
       });
     });
+
+    // Add debug button temporarily
+    const debugBtn = document.createElement("button");
+    debugBtn.textContent = "Debug Data";
+    debugBtn.style.marginTop = "10px";
+    debugBtn.style.background = "#666";
+    debugBtn.onclick = debugData;
+    document.querySelector(".container").appendChild(debugBtn);
+
   } catch (error) {
     console.error("Initialization error:", error);
     showMessage("Error initializing dashboard");
   }
 });
 
-// Make functions available for button
+// Make functions available globally
 window.downloadFile = downloadFile;
+window.debugData = debugData;
