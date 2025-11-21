@@ -16,6 +16,18 @@ function showMessage(text, type = "error") {
   }
 }
 
+// Format date function
+function formatDate(dateString) {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
 // Load employees list from employees table
 async function loadEmployees() {
   const employeesList = document.getElementById('employeesList');
@@ -126,8 +138,6 @@ async function encryptAndSendFile() {
       return;
     }
 
-    console.log("File uploaded:", uploadData);
-
     // Get all employees if "Send to All" is selected
     let employeeIds = [];
     if (sendToAll) {
@@ -169,8 +179,6 @@ async function encryptAndSendFile() {
       return;
     }
 
-    console.log("File records inserted for employees:", employeeIds);
-
     showMessage(`File sent successfully to ${employeeIds.length} employee(s)!`, "success");
     fileInput.value = "";
     
@@ -194,7 +202,6 @@ async function encryptAndSendFile() {
 }
 
 // Load received files
-// Load received files - UPDATED without relationship
 async function loadReceivedFiles() {
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -206,9 +213,7 @@ async function loadReceivedFiles() {
 
     const currentUser = userData.user;
 
-    console.log("Loading files for user:", currentUser.id);
-
-    // جلب الملفات المرسلة إليه أو التي أرسلها بدون علاقة
+    // Get files where current user is either recipient or sender
     const { data: files, error } = await supabase
       .from("shared_files")
       .select("*")
@@ -221,8 +226,6 @@ async function loadReceivedFiles() {
       return;
     }
 
-    console.log("Files loaded:", files);
-
     const receivedList = document.getElementById("receivedList");
     receivedList.innerHTML = "";
 
@@ -231,7 +234,7 @@ async function loadReceivedFiles() {
       return;
     }
 
-    // جلب أسماء الموظفين بشكل منفصل
+    // Get employee names separately
     const { data: employees } = await supabase
       .from("employees")
       .select("id, name");
@@ -243,7 +246,7 @@ async function loadReceivedFiles() {
       });
     }
 
-    // فصل الملفات المستلمة عن الملفات المرسلة
+    // Separate received files from sent files
     const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
     const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
 
@@ -260,7 +263,7 @@ async function loadReceivedFiles() {
         div.innerHTML = `
           <div>
             <strong>${file.file_name}</strong><br />
-            <small>Received: ${new Date(file.created_at).toLocaleDateString()}</small>
+            <small>Received: ${formatDate(file.created_at)}</small>
           </div>
           <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
@@ -282,7 +285,7 @@ async function loadReceivedFiles() {
         div.innerHTML = `
           <div>
             <strong>${file.file_name}</strong><br />
-            <small>Sent to: ${employeeName} • ${new Date(file.created_at).toLocaleDateString()}</small>
+            <small>Sent to: ${employeeName} • ${formatDate(file.created_at)}</small>
           </div>
           <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
@@ -321,44 +324,6 @@ async function downloadFile(path, fileName) {
   }
 }
 
-// Debug data function
-async function debugData() {
-  try {
-    const { data: userData } = await supabase.auth.getUser();
-    const currentUser = userData.user;
-    
-    console.log("=== DEBUG INFORMATION ===");
-    console.log("Current user ID:", currentUser.id);
-    console.log("Current user email:", currentUser.email);
-    
-    // Check all files in database
-    const { data: allFiles } = await supabase
-      .from("shared_files")
-      .select("*");
-    console.log("All files in database:", allFiles);
-    
-    // Check files for current user
-    const { data: userFiles } = await supabase
-      .from("shared_files")
-      .select("*")
-      .eq("allowed_user_id", currentUser.id);
-    console.log("Files for current user:", userFiles);
-    
-    // Check employees
-    const { data: employees } = await supabase
-      .from("employees")
-      .select("id, name, email");
-    console.log("All employees:", employees);
-    
-    console.log("=== END DEBUG ===");
-    showMessage("Debug data logged to console", "success");
-    
-  } catch (error) {
-    console.error("Debug error:", error);
-    showMessage("Debug failed: " + error.message);
-  }
-}
-
 // Logout
 async function logout() {
   await supabase.auth.signOut();
@@ -374,8 +339,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.location.href = "index.html";
       return;
     }
-
-    console.log("User authenticated:", user.email);
 
     await loadEmployees();
     await loadReceivedFiles();
@@ -393,14 +356,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
-    // Add debug button temporarily
-    const debugBtn = document.createElement("button");
-    debugBtn.textContent = "Debug Data";
-    debugBtn.style.marginTop = "10px";
-    debugBtn.style.background = "#666";
-    debugBtn.onclick = debugData;
-    document.querySelector(".container").appendChild(debugBtn);
-
   } catch (error) {
     console.error("Initialization error:", error);
     showMessage("Error initializing dashboard");
@@ -409,4 +364,3 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Make functions available globally
 window.downloadFile = downloadFile;
-window.debugData = debugData;
