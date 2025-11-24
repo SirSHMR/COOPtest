@@ -1,13 +1,14 @@
-// Supabase setup - بدون استيراد
+// =====================================================
+// Supabase setup
+// =====================================================
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
 
-// استخدم window.supabase بدلاً من الاستيراد
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ========================================
+// =====================================================
 // Message Function
-// ========================================
+// =====================================================
 function showMessage(text, type = "error") {
   const msg = document.getElementById("message");
   if (!msg) return;
@@ -16,60 +17,134 @@ function showMessage(text, type = "error") {
   msg.style.display = "block";
 }
 
-// ========================================
-// Login Function
-// ========================================
-async function loginUser() {
-  const emailInput = document.getElementById("Email");
-  const passwordInput = document.getElementById("password");
+// =====================================================
+// Helper: Get login attempts for user
+// =====================================================
+async function getAttempts(email) {
+  const { data, error } = await supabase
+    .from("login_attempts")
+    .select("*")
+    .eq("email", email)
+    .maybeSingle();
 
-  const email = emailInput.value.trim();
-  const password = passwordInput.value.trim();
+  if (error) {
+    console.error("Error fetching attempts:", error);
+    return null;
+  }
+
+  return data;
+}
+
+// =====================================================
+// Helper: Save failed login
+// =====================================================
+async function registerFail(email) {
+  const user = await getAttempts(email);
+
+  let attempts = 1;
+  let lockUntil = null;
+
+  if (user) {
+    attempts = user.attempts + 1;
+
+    // إذا وصلت 3 محاولات → حظر
+    if (attempts >= 3) {
+      const now = Date.now();
+      const baseDuration = 5 * 60 * 1000; // 5 دقائق
+
+      // إذا كان عنده حظر سابق → تضاعف المدة
+      const multiplier = Math.pow(2, attempts - 3);
+
+      const ban = baseDuration * multiplier;
+
+      lockUntil = now + ban;
+    }
+  } else {
+    // أول محاولة خطأ
+    attempts = 1;
+  }
+
+  await supabase.from("login_attempts")
+    .upsert({
+      email: email,
+      attempts: attempts,
+      lock_until: lockUntil
+    });
+}
+
+// =====================================================
+// Helper: Reset attempts on successful login
+// =====================================================
+async function resetAttempts(email) {
+  await supabase.from("login_attempts")
+    .delete()
+    .eq("email", email);
+}
+
+// =====================================================
+// Login Function
+// =====================================================
+async function loginUser() {
+  const email = document.getElementById("Email").value.trim();
+  const password = document.getElementById("password").value.trim();
 
   if (!email || !password) {
-    showMessage("Please enter both email and password", "error");
+    showMessage("Please enter both email and password");
     return;
   }
 
+  // =============================
+  // Check if user is locked
+  // =============================
+  const user = await getAttempts(email);
+
+  if (user && user.lock_until && Date.now() < user.lock_until) {
+    const remaining = Math.ceil((user.lock_until - Date.now()) / 60000); // دقائق
+    showMessage(`Too many attempts. Try again after ${remaining} minutes.`);
+    return;
+  }
+
+  // =============================
+  // Try login
+  // =============================
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password
+      email,
+      password
     });
 
     if (error) {
-      showMessage("Invalid email or password", "error");
-      console.error("Login error:", error.message);
+      await registerFail(email);
+      showMessage("Invalid email or password");
       return;
     }
 
     if (data.user) {
+      await resetAttempts(email);
       showMessage("Login successful! Redirecting...", "success");
+
       setTimeout(() => {
         window.location.href = "dashboard.html";
       }, 1500);
     }
-  } catch (error) {
-    showMessage("Network error. Please try again.", "error");
-    console.error("Login exception:", error);
+  } catch (err) {
+    console.error(err);
+    showMessage("Network error. Please try again.");
   }
 }
 
-// ========================================
+// =====================================================
 // Event Listeners
-// ========================================
-document.addEventListener("DOMContentLoaded", function() {
+// =====================================================
+document.addEventListener("DOMContentLoaded", function () {
   const loginBtn = document.getElementById("loginBtn");
-  if (loginBtn) {
-    loginBtn.addEventListener("click", loginUser);
-  }
-  
-  // إضافة إمكانية الدخول بالزر Enter
-  document.getElementById("Email").addEventListener("keypress", function(e) {
+  if (loginBtn) loginBtn.addEventListener("click", loginUser);
+
+  document.getElementById("Email").addEventListener("keypress", e => {
     if (e.key === "Enter") loginUser();
   });
-  
-  document.getElementById("password").addEventListener("keypress", function(e) {
+
+  document.getElementById("password").addEventListener("keypress", e => {
     if (e.key === "Enter") loginUser();
   });
 });
