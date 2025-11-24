@@ -13,17 +13,14 @@ class EncryptionManager {
     getOrCreateKey() {
         let key = localStorage.getItem('aes_encryption_key');
         if (!key) {
-            // Generate proper 256-bit key (32 bytes)
-            key = this.generateRandomKey(32);
+            // Generate proper 256-bit key (32 bytes exactly)
+            const keyArray = new Uint8Array(32);
+            crypto.getRandomValues(keyArray);
+            key = Array.from(keyArray).join(','); // Store as comma-separated values
             localStorage.setItem('aes_encryption_key', key);
+            console.log('New encryption key generated');
         }
         return key;
-    }
-
-    generateRandomKey(length) {
-        const array = new Uint8Array(length);
-        crypto.getRandomValues(array);
-        return btoa(String.fromCharCode(...array)); // Convert to base64
     }
 
     async encryptFile(file) {
@@ -60,6 +57,7 @@ class EncryptionManager {
                     
                     resolve(result);
                 } catch (error) {
+                    console.error('Encryption error:', error);
                     reject(error);
                 }
             };
@@ -92,20 +90,34 @@ class EncryptionManager {
     }
 
     async importKey() {
-        // Convert base64 key back to ArrayBuffer
-        const keyStr = atob(this.key);
-        const keyBuffer = new Uint8Array(keyStr.length);
-        for (let i = 0; i < keyStr.length; i++) {
-            keyBuffer[i] = keyStr.charCodeAt(i);
+        try {
+            // Convert comma-separated string back to Uint8Array
+            const keyArray = this.key.split(',').map(Number);
+            const keyBuffer = new Uint8Array(keyArray);
+            
+            // Verify key length
+            if (keyBuffer.length !== 32) {
+                throw new Error(`Invalid key length: ${keyBuffer.length}. Expected 32 bytes.`);
+            }
+            
+            return await crypto.subtle.importKey(
+                "raw",
+                keyBuffer,
+                { name: "AES-GCM" },
+                false,
+                ["encrypt", "decrypt"]
+            );
+        } catch (error) {
+            console.error('Key import error:', error);
+            throw error;
         }
-        
-        return await crypto.subtle.importKey(
-            "raw",
-            keyBuffer,
-            { name: "AES-GCM" },
-            false,
-            ["encrypt", "decrypt"]
-        );
+    }
+
+    // Method to reset key if needed
+    resetKey() {
+        localStorage.removeItem('aes_encryption_key');
+        this.key = this.getOrCreateKey();
+        console.log('Encryption key reset');
     }
 }
 
@@ -476,3 +488,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Make functions available globally
 window.downloadFile = downloadFile;
+
+// Add reset key function for testing
+window.resetEncryptionKey = function() {
+    encryptionManager.resetKey();
+    showMessage("Encryption key reset successfully", "success");
+};
