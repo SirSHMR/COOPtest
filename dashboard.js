@@ -4,362 +4,468 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// Encryption key management
+class EncryptionManager {
+    constructor() {
+        this.key = this.getOrCreateKey();
+    }
+
+    getOrCreateKey() {
+        let key = localStorage.getItem('aes_encryption_key');
+        if (!key) {
+            // Generate random 256-bit key
+            key = this.generateRandomKey(32);
+            localStorage.setItem('aes_encryption_key', key);
+        }
+        return key;
+    }
+
+    generateRandomKey(length) {
+        const array = new Uint8Array(length);
+        crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    async encryptFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = async (e) => {
+                try {
+                    const fileData = e.target.result;
+                    
+                    // Generate random IV
+                    const iv = crypto.getRandomValues(new Uint8Array(16));
+                    
+                    // Import key
+                    const cryptoKey = await this.importKey();
+                    
+                    // Encrypt data
+                    const encryptedData = await crypto.subtle.encrypt(
+                        {
+                            name: "AES-GCM",
+                            iv: iv
+                        },
+                        cryptoKey,
+                        fileData
+                    );
+                    
+                    const result = {
+                        iv: Array.from(iv),
+                        encryptedData: Array.from(new Uint8Array(encryptedData)),
+                        originalName: file.name,
+                        mimeType: file.type,
+                        encryptedAt: new Date().toISOString()
+                    };
+                    
+                    resolve(result);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            
+            reader.onerror = (error) => reject(error);
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    async decryptFile(encryptedFileData) {
+        try {
+            const cryptoKey = await this.importKey();
+            const iv = new Uint8Array(encryptedFileData.iv);
+            const encryptedBuffer = new Uint8Array(encryptedFileData.encryptedData);
+            
+            const decryptedData = await crypto.subtle.decrypt(
+                {
+                    name: "AES-GCM",
+                    iv: iv
+                },
+                cryptoKey,
+                encryptedBuffer
+            );
+            
+            return new Blob([decryptedData], { type: encryptedFileData.mimeType });
+        } catch (error) {
+            console.error('Decryption failed:', error);
+            throw error;
+        }
+    }
+
+    async importKey() {
+        const keyBuffer = new TextEncoder().encode(this.key);
+        return await crypto.subtle.importKey(
+            "raw",
+            keyBuffer,
+            { name: "AES-GCM" },
+            false,
+            ["encrypt", "decrypt"]
+        );
+    }
+}
+
+// Initialize encryption manager
+const encryptionManager = new EncryptionManager();
+
 // Messages
 function showMessage(text, type = "error") {
-  const msgBox = document.getElementById("messageBox");
-  msgBox.textContent = text;
-  msgBox.className = `msgBox ${type === 'error' ? 'errorMsg' : 'successMsg'}`;
-  msgBox.style.display = 'block';
+    const msgBox = document.getElementById("messageBox");
+    msgBox.textContent = text;
+    msgBox.className = `msgBox ${type === 'error' ? 'errorMsg' : 'successMsg'}`;
+    msgBox.style.display = 'block';
 
-  if (type === 'success') {
-    setTimeout(() => msgBox.style.display = 'none', 3000);
-  }
+    if (type === 'success') {
+        setTimeout(() => msgBox.style.display = 'none', 3000);
+    }
 }
 
 // Format date function
 function formatDate(dateString) {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 }
 
 // Load employees list from employees table
 async function loadEmployees() {
-  const employeesList = document.getElementById('employeesList');
-  employeesList.innerHTML = '';
+    const employeesList = document.getElementById('employeesList');
+    employeesList.innerHTML = '';
 
-  const { data, error } = await supabase
-    .from("employees")
-    .select("id, name, email");
+    const { data, error } = await supabase
+        .from("employees")
+        .select("id, name, email");
 
-  if (error) {
-    console.error("Error loading employees:", error);
-    showMessage("Error loading employees list: " + error.message);
-    return;
-  }
+    if (error) {
+        console.error("Error loading employees:", error);
+        showMessage("Error loading employees list: " + error.message);
+        return;
+    }
 
-  if (!data || data.length === 0) {
-    employeesList.innerHTML = '<p>No employees found</p>';
-    return;
-  }
+    if (!data || data.length === 0) {
+        employeesList.innerHTML = '<p>No employees found</p>';
+        return;
+    }
 
-  data.forEach(emp => {
-    const div = document.createElement("div");
-    div.className = "employee-checkbox";
-    div.innerHTML = `
-      <label>
-        <input type="checkbox" class="employee-checkbox" value="${emp.id}">
-        ${emp.name} (${emp.email})
-      </label>
-    `;
-    employeesList.appendChild(div);
-  });
+    data.forEach(emp => {
+        const div = document.createElement("div");
+        div.className = "employee-checkbox";
+        div.innerHTML = `
+        <label>
+            <input type="checkbox" class="employee-checkbox" value="${emp.id}">
+            ${emp.name} (${emp.email})
+        </label>
+        `;
+        employeesList.appendChild(div);
+    });
 }
 
 // Get selected employees
 function getSelectedEmployees() {
-  const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
-  const selectedEmployees = [];
-  
-  checkboxes.forEach(checkbox => {
-    if (checkbox.checked) {
-      selectedEmployees.push(checkbox.value);
-    }
-  });
-  
-  return selectedEmployees;
-}
-
-// Check storage permissions
-async function checkStoragePermissions() {
-  try {
-    const testBlob = new Blob(['test'], { type: 'text/plain' });
-    const testFileName = `test_${Date.now()}.txt`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('files')
-      .upload(testFileName, testBlob);
-    
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      return false;
-    }
-    
-    await supabase.storage.from('files').remove([testFileName]);
-    return true;
-    
-  } catch (error) {
-    console.error('Storage test failed:', error);
-    return false;
-  }
-}
-
-// Send file
-async function encryptAndSendFile() {
-  const fileInput = document.getElementById('fileInput');
-  const selectAllCheckbox = document.getElementById('selectAllEmployees');
-  
-  const file = fileInput.files[0];
-  const sendToAll = selectAllCheckbox.checked;
-  const selectedEmployees = getSelectedEmployees();
-
-  if (!file) return showMessage("Please select a file");
-  if (!sendToAll && selectedEmployees.length === 0) return showMessage("Please select at least one employee");
-
-  try {
-    // Check storage permissions first
-    const hasStorageAccess = await checkStoragePermissions();
-    if (!hasStorageAccess) {
-      showMessage("Storage permissions issue. Please check bucket policies.");
-      return;
-    }
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      showMessage("Please login again");
-      return;
-    }
-
-    const fileName = `${Date.now()}_${file.name}`;
-
-    // Upload file to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("files")
-      .upload(fileName, file);
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      showMessage("Upload error: " + uploadError.message);
-      return;
-    }
-
-    // Get all employees if "Send to All" is selected
-    let employeeIds = [];
-    if (sendToAll) {
-      const { data: allEmployees, error: empError } = await supabase
-        .from("employees")
-        .select("id");
-      
-      if (empError) {
-        showMessage("Error fetching employees: " + empError.message);
-        return;
-      }
-      
-      employeeIds = allEmployees.map(emp => emp.id);
-    } else {
-      employeeIds = selectedEmployees;
-    }
-
-    // Save data in shared_files for each employee
-    const currentUser = user.id;
-    const fileRecords = employeeIds.map(employeeId => ({
-      file_name: file.name,
-      storage_path: uploadData.path,
-      allowed_user_id: employeeId,
-      uploaded_by: currentUser,
-      created_at: new Date().toISOString(),
-    }));
-
-    // Insert records into shared_files table
-    const { error: dbError } = await supabase
-      .from("shared_files")
-      .insert(fileRecords);
-
-    if (dbError) {
-      console.error("Database error:", dbError);
-      showMessage("Database error: " + dbError.message);
-      
-      // Try to delete the uploaded file if DB insertion fails
-      await supabase.storage.from("files").remove([uploadData.path]);
-      return;
-    }
-
-    showMessage(`File sent successfully to ${employeeIds.length} employee(s)!`, "success");
-    fileInput.value = "";
-    
-    // Reset options
-    selectAllCheckbox.checked = false;
     const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
+    const selectedEmployees = [];
+    
     checkboxes.forEach(checkbox => {
-      checkbox.checked = false;
-      checkbox.disabled = false;
+        if (checkbox.checked) {
+            selectedEmployees.push(checkbox.value);
+        }
     });
+    
+    return selectedEmployees;
+}
 
-    // Reload received files
-    setTimeout(() => {
-      loadReceivedFiles();
-    }, 1000);
-  } 
-  catch (err) {
-    console.error("Unexpected error:", err);
-    showMessage("Unexpected error: " + err.message);
-  }
+// Send encrypted file
+async function encryptAndSendFile() {
+    const fileInput = document.getElementById('fileInput');
+    const selectAllCheckbox = document.getElementById('selectAllEmployees');
+    
+    const file = fileInput.files[0];
+    const sendToAll = selectAllCheckbox.checked;
+    const selectedEmployees = getSelectedEmployees();
+
+    if (!file) return showMessage("Please select a file");
+    if (!sendToAll && selectedEmployees.length === 0) return showMessage("Please select at least one employee");
+
+    try {
+        showMessage("Encrypting file with AES...", "success");
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+            showMessage("Please login again");
+            return;
+        }
+
+        // Encrypt the file
+        const encryptedResult = await encryptionManager.encryptFile(file);
+        
+        // Convert to JSON for storage
+        const encryptedJson = JSON.stringify(encryptedResult);
+        const encryptedBlob = new Blob([encryptedJson], { 
+            type: 'application/json' 
+        });
+
+        const fileName = `encrypted_${Date.now()}_${file.name}.aes`;
+
+        // Upload encrypted file
+        const { data: uploadData, error: uploadError } = await supabase.storage
+            .from("files")
+            .upload(fileName, encryptedBlob);
+
+        if (uploadError) {
+            console.error("Upload error:", uploadError);
+            showMessage("Upload error: " + uploadError.message);
+            return;
+        }
+
+        // Get all employees if "Send to All" is selected
+        let employeeIds = [];
+        if (sendToAll) {
+            const { data: allEmployees, error: empError } = await supabase
+                .from("employees")
+                .select("id");
+            
+            if (empError) {
+                showMessage("Error fetching employees: " + empError.message);
+                return;
+            }
+            
+            employeeIds = allEmployees.map(emp => emp.id);
+        } else {
+            employeeIds = selectedEmployees;
+        }
+
+        // Save data in shared_files for each employee
+        const currentUser = user.id;
+        const fileRecords = employeeIds.map(employeeId => ({
+            file_name: file.name,
+            storage_path: uploadData.path,
+            allowed_user_id: employeeId,
+            uploaded_by: currentUser,
+            created_at: new Date().toISOString(),
+            is_encrypted: true
+        }));
+
+        // Insert records into shared_files table
+        const { error: dbError } = await supabase
+            .from("shared_files")
+            .insert(fileRecords);
+
+        if (dbError) {
+            console.error("Database error:", dbError);
+            showMessage("Database error: " + dbError.message);
+            
+            // Try to delete the uploaded file if DB insertion fails
+            await supabase.storage.from("files").remove([uploadData.path]);
+            return;
+        }
+
+        showMessage(`File encrypted and sent successfully to ${employeeIds.length} employee(s)!`, "success");
+        fileInput.value = "";
+        
+        // Reset options
+        selectAllCheckbox.checked = false;
+        const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.disabled = false;
+        });
+
+        // Reload received files
+        setTimeout(() => {
+            loadReceivedFiles();
+        }, 1000);
+    } 
+    catch (err) {
+        console.error("Unexpected error:", err);
+        showMessage("Error: " + err.message);
+    }
 }
 
 // Load received files
 async function loadReceivedFiles() {
-  try {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      console.error("Auth error:", userError);
-      showMessage("Please login again");
-      return;
+    try {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        if (userError || !userData.user) {
+            console.error("Auth error:", userError);
+            showMessage("Please login again");
+            return;
+        }
+
+        const currentUser = userData.user;
+
+        // Get files where current user is either recipient or sender
+        const { data: files, error } = await supabase
+            .from("shared_files")
+            .select("*")
+            .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error("Error loading files:", error);
+            showMessage("Error loading files: " + error.message);
+            return;
+        }
+
+        const receivedList = document.getElementById("receivedList");
+        receivedList.innerHTML = "";
+
+        if (!files || files.length === 0) {
+            receivedList.innerHTML = "<p>No files received yet.</p>";
+            return;
+        }
+
+        // Get employee names separately
+        const { data: employees } = await supabase
+            .from("employees")
+            .select("id, name");
+
+        const employeeMap = {};
+        if (employees) {
+            employees.forEach(emp => {
+                employeeMap[emp.id] = emp.name;
+            });
+        }
+
+        // Separate received files from sent files
+        const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
+        const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
+
+        if (receivedFiles.length > 0) {
+            const receivedHeader = document.createElement("h3");
+            receivedHeader.textContent = "Received Files";
+            receivedHeader.style.marginTop = "20px";
+            receivedHeader.style.color = "#333";
+            receivedList.appendChild(receivedHeader);
+
+            receivedFiles.forEach(file => {
+                const encryptedBadge = file.is_encrypted ? ' 🔒 Encrypted' : '';
+                const div = document.createElement("div");
+                div.className = "file-item";
+                div.innerHTML = `
+                <div>
+                    <strong>${file.file_name}${encryptedBadge}</strong><br />
+                    <small>Received: ${formatDate(file.created_at)}</small>
+                </div>
+                <button onclick="downloadFile('${file.storage_path}', '${file.file_name}', ${file.is_encrypted})">Download</button>
+                `;
+                receivedList.appendChild(div);
+            });
+        }
+
+        if (sentFiles.length > 0) {
+            const sentHeader = document.createElement("h3");
+            sentHeader.textContent = "Sent Files";
+            sentHeader.style.marginTop = "20px";
+            sentHeader.style.color = "#333";
+            receivedList.appendChild(sentHeader);
+
+            sentFiles.forEach(file => {
+                const employeeName = employeeMap[file.allowed_user_id] || 'Employee';
+                const encryptedBadge = file.is_encrypted ? ' 🔒 Encrypted' : '';
+                const div = document.createElement("div");
+                div.className = "file-item";
+                div.innerHTML = `
+                <div>
+                    <strong>${file.file_name}${encryptedBadge}</strong><br />
+                    <small>Sent to: ${employeeName} • ${formatDate(file.created_at)}</small>
+                </div>
+                <button onclick="downloadFile('${file.storage_path}', '${file.file_name}', ${file.is_encrypted})">Download</button>
+                `;
+                receivedList.appendChild(div);
+            });
+        }
+
+    } catch (err) {
+        console.error("Unexpected error in loadReceivedFiles:", err);
+        showMessage("Error loading files");
     }
-
-    const currentUser = userData.user;
-
-    // Get files where current user is either recipient or sender
-    const { data: files, error } = await supabase
-      .from("shared_files")
-      .select("*")
-      .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error("Error loading files:", error);
-      showMessage("Error loading files: " + error.message);
-      return;
-    }
-
-    const receivedList = document.getElementById("receivedList");
-    receivedList.innerHTML = "";
-
-    if (!files || files.length === 0) {
-      receivedList.innerHTML = "<p>No files received yet.</p>";
-      return;
-    }
-
-    // Get employee names separately
-    const { data: employees } = await supabase
-      .from("employees")
-      .select("id, name");
-
-    const employeeMap = {};
-    if (employees) {
-      employees.forEach(emp => {
-        employeeMap[emp.id] = emp.name;
-      });
-    }
-
-    // Separate received files from sent files
-    const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
-    const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
-
-    if (receivedFiles.length > 0) {
-      const receivedHeader = document.createElement("h3");
-      receivedHeader.textContent = "Received Files";
-      receivedHeader.style.marginTop = "20px";
-      receivedHeader.style.color = "#333";
-      receivedList.appendChild(receivedHeader);
-
-      receivedFiles.forEach(file => {
-        const div = document.createElement("div");
-        div.className = "file-item";
-        div.innerHTML = `
-          <div>
-            <strong>${file.file_name}</strong><br />
-            <small>Received: ${formatDate(file.created_at)}</small>
-          </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
-        `;
-        receivedList.appendChild(div);
-      });
-    }
-
-    if (sentFiles.length > 0) {
-      const sentHeader = document.createElement("h3");
-      sentHeader.textContent = "Sent Files";
-      sentHeader.style.marginTop = "20px";
-      sentHeader.style.color = "#333";
-      receivedList.appendChild(sentHeader);
-
-      sentFiles.forEach(file => {
-        const employeeName = employeeMap[file.allowed_user_id] || 'Employee';
-        const div = document.createElement("div");
-        div.className = "file-item";
-        div.innerHTML = `
-          <div>
-            <strong>${file.file_name}</strong><br />
-            <small>Sent to: ${employeeName} • ${formatDate(file.created_at)}</small>
-          </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
-        `;
-        receivedList.appendChild(div);
-      });
-    }
-
-  } catch (err) {
-    console.error("Unexpected error in loadReceivedFiles:", err);
-    showMessage("Error loading files");
-  }
 }
 
-// Download file
-async function downloadFile(path, fileName) {
-  try {
-    const { data, error } = await supabase.storage
-      .from("files")
-      .download(path);
+// Download and decrypt file
+async function downloadFile(path, fileName, isEncrypted = true) {
+    try {
+        showMessage("Downloading file...", "success");
 
-    if (error) {
-      showMessage("Error downloading file: " + error.message);
-      return;
+        const { data, error } = await supabase.storage
+            .from("files")
+            .download(path);
+
+        if (error) {
+            showMessage("Error downloading file: " + error.message);
+            return;
+        }
+
+        let downloadBlob;
+
+        if (isEncrypted) {
+            showMessage("Decrypting file...", "success");
+            
+            // Read encrypted data
+            const encryptedText = await data.text();
+            const encryptedData = JSON.parse(encryptedText);
+            
+            // Decrypt the file
+            downloadBlob = await encryptionManager.decryptFile(encryptedData);
+        } else {
+            downloadBlob = data;
+        }
+
+        // Create download link
+        const url = URL.createObjectURL(downloadBlob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        
+        showMessage("File downloaded successfully!", "success");
+    } catch (err) {
+        console.error("Download error:", err);
+        showMessage("Download error: " + err.message);
     }
-
-    const url = URL.createObjectURL(data);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    showMessage("Download error: " + err.message);
-  }
 }
 
 // Logout
 async function logout() {
-  await supabase.auth.signOut();
-  window.location.href = "index.html";
+    await supabase.auth.signOut();
+    window.location.href = "index.html";
 }
 
 // On page load
 document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      window.location.href = "index.html";
-      return;
+    try {
+        // Check if user is authenticated
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            window.location.href = "index.html";
+            return;
+        }
+
+        await loadEmployees();
+        await loadReceivedFiles();
+
+        // Add event listeners
+        document.getElementById("encryptBtn").addEventListener("click", encryptAndSendFile);
+        document.getElementById("logoutBtn").addEventListener("click", logout);
+        
+        // Add event for "Send to All Employees" option
+        document.getElementById("selectAllEmployees").addEventListener("change", function() {
+            const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+                checkbox.disabled = this.checked;
+            });
+        });
+
+    } catch (error) {
+        console.error("Initialization error:", error);
+        showMessage("Error initializing dashboard");
     }
-
-    await loadEmployees();
-    await loadReceivedFiles();
-
-    // Add event listeners
-    document.getElementById("encryptBtn").addEventListener("click", encryptAndSendFile);
-    document.getElementById("logoutBtn").addEventListener("click", logout);
-    
-    // Add event for "Send to All Employees" option
-    document.getElementById("selectAllEmployees").addEventListener("change", function() {
-      const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
-      checkboxes.forEach(checkbox => {
-        checkbox.checked = this.checked;
-        checkbox.disabled = this.checked;
-      });
-    });
-
-  } catch (error) {
-    console.error("Initialization error:", error);
-    showMessage("Error initializing dashboard");
-  }
 });
 
 // Make functions available globally
