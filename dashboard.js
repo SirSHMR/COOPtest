@@ -4,7 +4,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Encryption key management
+// Encryption key management - FIXED
 class EncryptionManager {
     constructor() {
         this.key = this.getOrCreateKey();
@@ -13,7 +13,7 @@ class EncryptionManager {
     getOrCreateKey() {
         let key = localStorage.getItem('aes_encryption_key');
         if (!key) {
-            // Generate random 256-bit key
+            // Generate proper 256-bit key (32 bytes)
             key = this.generateRandomKey(32);
             localStorage.setItem('aes_encryption_key', key);
         }
@@ -23,7 +23,7 @@ class EncryptionManager {
     generateRandomKey(length) {
         const array = new Uint8Array(length);
         crypto.getRandomValues(array);
-        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+        return btoa(String.fromCharCode(...array)); // Convert to base64
     }
 
     async encryptFile(file) {
@@ -92,7 +92,13 @@ class EncryptionManager {
     }
 
     async importKey() {
-        const keyBuffer = new TextEncoder().encode(this.key);
+        // Convert base64 key back to ArrayBuffer
+        const keyStr = atob(this.key);
+        const keyBuffer = new Uint8Array(keyStr.length);
+        for (let i = 0; i < keyStr.length; i++) {
+            keyBuffer[i] = keyStr.charCodeAt(i);
+        }
+        
         return await crypto.subtle.importKey(
             "raw",
             keyBuffer,
