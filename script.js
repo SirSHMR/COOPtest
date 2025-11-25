@@ -68,7 +68,7 @@ async function registerFail(email) {
     .upsert({
       email: email,
       attempts: attempts,
-      lock_until: lockUntil
+      lock_until: lockUntil,
       lock_minutes: lockMinutes
     });
 }
