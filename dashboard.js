@@ -147,12 +147,7 @@ function getSelectedEmployees() {
   return selectedEmployees;
 }
 
-// Check storage permissions
-const hasStorageAccess = await checkStoragePermissions();
-if (!hasStorageAccess) {
-  showMessage("Storage permissions issue. Please check bucket policies.");
-  return;
-}
+
 
 
 // Send file
