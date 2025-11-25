@@ -57,10 +57,10 @@ async function registerFail(email) {
 
       const ban = baseDuration * multiplier;
 
-      // new → تحويله إلى timestamp
-      lockUntil = new Date(now + ban).toISOString();
+      lockUntil = now + ban;
     }
   } else {
+    // أول محاولة خطأ
     attempts = 1;
   }
 
@@ -98,16 +98,10 @@ async function loginUser() {
   // =============================
   const user = await getAttempts(email);
 
-  if (user && user.lock_until) {
-    const now = new Date();
-    const lockTime = new Date(user.lock_until);
-
-    if (now < lockTime) {
-      const remainingMs = lockTime - now;
-      const remaining = Math.ceil(remainingMs / 60000);
-      showMessage(`Too many attempts. Try again after ${remaining} minutes.`);
-      return;
-    }
+  if (user && user.lock_until && Date.now() < user.lock_until) {
+    const remaining = Math.ceil((user.lock_until - Date.now()) / 60000); // دقائق
+    showMessage(`Too many attempts. Try again after ${remaining} minutes.`);
+    return;
   }
 
   // =============================
