@@ -126,13 +126,8 @@ async function loginUser() {
 
     if (data.user) {
       await resetAttempts(email);
-      const { data: rpcData, error: rpcError } = await supabase.rpc("record_success_login", {
-        user_email: email
-      });
+      showMessage("Login successful! Redirecting...", "success");
 
-  if (rpcError) console.error("RPC Error:", rpcError);
-      showMessage("Login successful! Redirecting...", "success");  
-      
       setTimeout(() => {
         window.location.href = "dashboard.html";
       }, 1500);
