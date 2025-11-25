@@ -126,10 +126,8 @@ async function loginUser() {
 
     if (data.user) {
       await resetAttempts(email);
-      const now = new Date().toLocaleString('en-SA', { timeZone: 'Asia/Riyadh' });
       const { data: rpcData, error: rpcError } = await supabase.rpc("record_success_login", {
-      user_email: email,
-      login_time: now
+      user_email: email
     });
 
   if (rpcError) console.error("RPC Error:", rpcError);
