@@ -197,7 +197,8 @@ async function encryptAndSendFile() {
       showMessage("Please login again");
       return;
     }
-    const fileName = ${Date.now()}_${file.name};
+
+    const fileName = `${Date.now()}_${file.name}`;
 
     // Encrypt file BEFORE upload
 const { encrypted, iv } = await encryptFile(file);
