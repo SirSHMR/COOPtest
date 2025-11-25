@@ -128,6 +128,8 @@ async function loginUser() {
       await resetAttempts(email);
       showMessage("Login successful! Redirecting...", "success");
 
+      await supabase.rpc("increment_success_login", { user_email: email });
+      
       setTimeout(() => {
         window.location.href = "dashboard.html";
       }, 1500);
