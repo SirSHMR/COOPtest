@@ -46,6 +46,7 @@ async function registerFail(email) {
 
   let attempts = 1;
   let lockUntil = null;
+  let lockMinutes = null;
 
   if (user) {
     attempts = user.attempts + 1;
@@ -58,6 +59,7 @@ async function registerFail(email) {
       // إذا كان عنده حظر سابق → تضاعف المدة
       const multiplier = Math.pow(2, attempts - 3);
       const ban = baseDuration * multiplier;
+      lockMinutes = 5 * multiplier;
       lockUntil = now + ban;
     }
   } else {
@@ -70,6 +72,7 @@ async function registerFail(email) {
       email: email,
       attempts: attempts,
       lock_until: lockUntil,
+      lock_minutes: lockMinutes,
       last_attempt_time: now
     });
 }
