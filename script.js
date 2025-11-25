@@ -40,7 +40,7 @@ async function getAttempts(email) {
 // =====================================================
 async function registerFail(email) {
   const user = await getAttempts(email);
-  const saudiTime = new Date().toLocaleString('ar-SA', {
+  const now = new Date().toLocaleString('en-SA', {
     timeZone: 'Asia/Riyadh'
   });
 
@@ -57,9 +57,7 @@ async function registerFail(email) {
 
       // إذا كان عنده حظر سابق → تضاعف المدة
       const multiplier = Math.pow(2, attempts - 3);
-
       const ban = baseDuration * multiplier;
-
       lockUntil = now + ban;
     }
   } else {
@@ -72,7 +70,7 @@ async function registerFail(email) {
       email: email,
       attempts: attempts,
       lock_until: lockUntil,
-      last_attempt_time: saudiTime
+      last_attempt_time: now
     });
 }
 
