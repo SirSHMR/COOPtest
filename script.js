@@ -125,10 +125,10 @@ async function loginUser() {
     }
 
     if (data.user) {
-      await resetAttempts(email);
-      showMessage("Login successful! Redirecting...", "success");
-
       await supabase.rpc("increment_success_login", { user_email: email });
+      
+      await resetAttempts(email);
+      showMessage("Login successful! Redirecting...", "success");  
       
       setTimeout(() => {
         window.location.href = "dashboard.html";
