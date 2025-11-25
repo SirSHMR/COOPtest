@@ -1,3 +1,75 @@
+// --- AES Encryption Helpers (User-Specific Key) ---
+
+// Convert ArrayBuffer ↔ Base64
+function arrayBufferToBase64(buffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  bytes.forEach(byte => binary += String.fromCharCode(byte));
+  return btoa(binary);
+}
+
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+// Generate and store user-specific AES key
+async function getUserKey() {
+  let keyBase64 = localStorage.getItem("user_aes_key");
+
+  if (!keyBase64) {
+    const newKey = await crypto.subtle.generateKey(
+      { name: "AES-GCM", length: 256 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+
+    const rawKey = await crypto.subtle.exportKey("raw", newKey);
+    keyBase64 = arrayBufferToBase64(rawKey);
+    localStorage.setItem("user_aes_key", keyBase64);
+  }
+
+  const rawKey = base64ToArrayBuffer(keyBase64);
+
+  return await crypto.subtle.importKey(
+    "raw",
+    rawKey,
+    "AES-GCM",
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+// Encrypt file → returns encrypted ArrayBuffer + IV
+async function encryptFile(file) {
+  const key = await getUserKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // GCM required
+
+  const fileBuffer = await file.arrayBuffer();
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    fileBuffer
+  );
+
+  return { encrypted, iv };
+}
+
+// Decrypt ArrayBuffer → returns Blob
+async function decryptFile(buffer, iv) {
+  const key = await getUserKey();
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    buffer
+  );
+
+  return new Blob([decrypted]);
+}
+
 // Supabase setup
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
