@@ -148,28 +148,12 @@ function getSelectedEmployees() {
 }
 
 // Check storage permissions
-async function checkStoragePermissions() {
-  try {
-    const testBlob = new Blob(['test'], { type: 'text/plain' });
-    const testFileName = `test_${Date.now()}.txt`;
-    
-    const { error: uploadError } = await supabase.storage
-      .from('files')
-      .upload(testFileName, testBlob);
-    
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      return false;
-    }
-    
-    await supabase.storage.from('files').remove([testFileName]);
-    return true;
-    
-  } catch (error) {
-    console.error('Storage test failed:', error);
-    return false;
-  }
+const hasStorageAccess = await checkStoragePermissions();
+if (!hasStorageAccess) {
+  showMessage("Storage permissions issue. Please check bucket policies.");
+  return;
 }
+
 
 // Send file
 async function encryptAndSendFile() {
