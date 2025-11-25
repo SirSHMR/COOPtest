@@ -40,7 +40,9 @@ async function getAttempts(email) {
 // =====================================================
 async function registerFail(email) {
   const user = await getAttempts(email);
-  const now = new Date().toISOString();
+  const now = new Date().toLocaleString('en-SA', {
+    timeZone: 'Asia/Riyadh'
+  });
 
   let attempts = 1;
   let lockUntil = null;
