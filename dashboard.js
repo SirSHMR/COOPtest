@@ -163,19 +163,6 @@ async function encryptAndSendFile() {
   if (!sendToAll && selectedEmployees.length === 0) return showMessage("Please select at least one employee");
 
   try {
-    // Check storage permissions first
-    const hasStorageAccess = await checkStoragePermissions();
-    if (!hasStorageAccess) {
-      showMessage("Storage permissions issue. Please check bucket policies.");
-      return;
-    }
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      showMessage("Please login again");
-      return;
-    }
-
     const fileName = `${Date.now()}_${file.name}`;
 
     // Encrypt file BEFORE upload
