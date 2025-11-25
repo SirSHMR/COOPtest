@@ -125,8 +125,6 @@ async function loginUser() {
     }
 
     if (data.user) {
-      await supabase.rpc("increment_success_login", { user_email: email });
-      
       await resetAttempts(email);
       showMessage("Login successful! Redirecting...", "success");  
       
