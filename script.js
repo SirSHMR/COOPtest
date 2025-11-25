@@ -40,6 +40,7 @@ async function getAttempts(email) {
 // =====================================================
 async function registerFail(email) {
   const user = await getAttempts(email);
+  const now = new Date().toISOString();
 
   let attempts = 1;
   let lockUntil = null;
