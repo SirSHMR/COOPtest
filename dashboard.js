@@ -178,6 +178,9 @@ combined.set(iv, 0);
 combined.set(new Uint8Array(encrypted), iv.byteLength);
 
 // Upload encrypted file
+const saudi = new Date().toLocaleString('en-SA', {
+    timeZone: 'Asia/Riyadh'
+  });
 const { data: uploadData, error: uploadError } = await supabase.storage
   .from("files")
   .upload(fileName, combined.buffer);
@@ -213,7 +216,7 @@ const { data: uploadData, error: uploadError } = await supabase.storage
       storage_path: uploadData.path,
       allowed_user_id: employeeId,
       uploaded_by: currentUser,
-      created_at: new Date().toISOString(),
+      created_at: saudi,
     }));
 
     // Insert records into shared_files table
