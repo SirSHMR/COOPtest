@@ -40,13 +40,12 @@ async function getAttempts(email) {
 // =====================================================
 async function registerFail(email) {
   const user = await getAttempts(email);
-  const now = new Date().toLocaleString('en-SA', {
+  const saudiTime = new Date().toLocaleString('ar-SA', {
     timeZone: 'Asia/Riyadh'
   });
 
   let attempts = 1;
   let lockUntil = null;
-  let lockMinutes = null;
 
   if (user) {
     attempts = user.attempts + 1;
@@ -58,8 +57,9 @@ async function registerFail(email) {
 
       // إذا كان عنده حظر سابق → تضاعف المدة
       const multiplier = Math.pow(2, attempts - 3);
+
       const ban = baseDuration * multiplier;
-      lockMinutes = 5 * multiplier; // 5, 10, 20, 40...
+
       lockUntil = now + ban;
     }
   } else {
@@ -72,8 +72,7 @@ async function registerFail(email) {
       email: email,
       attempts: attempts,
       lock_until: lockUntil,
-      lock_minutes: lockMinutes,
-      last_attempt_time: now
+      last_attempt_time: saudiTime
     });
 }
 
@@ -81,16 +80,8 @@ async function registerFail(email) {
 // Helper: Reset attempts on successful login
 // =====================================================
 async function resetAttempts(email) {
-  const saudiTime = new Date().toLocaleString('en-SA', {
-    timeZone: 'Asia/Riyadh'
-  });
   await supabase.from("login_attempts")
-    .update({
-      attempts: 0,
-      lock_until: null,
-      last_attempt_time: null,
-      last_successful_login: saudiTime
-    })
+    .delete()
     .eq("email", email);
 }
 
