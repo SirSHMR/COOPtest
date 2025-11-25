@@ -69,7 +69,8 @@ async function registerFail(email) {
       email: email,
       attempts: attempts,
       lock_until: lockUntil,
-      lock_minutes: lockMinutes
+      lock_minutes: lockMinutes,
+      last_attempt_time: now
     });
 }
 
@@ -78,7 +79,11 @@ async function registerFail(email) {
 // =====================================================
 async function resetAttempts(email) {
   await supabase.from("login_attempts")
-    .delete()
+    .update({
+      attempts: 0,
+      lock_until: null,
+      last_attempt_time: null
+    })
     .eq("email", email);
 }
 
