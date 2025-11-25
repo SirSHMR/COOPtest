@@ -81,11 +81,15 @@ async function registerFail(email) {
 // Helper: Reset attempts on successful login
 // =====================================================
 async function resetAttempts(email) {
+  const saudiTime = new Date().toLocaleString('en-SA', {
+    timeZone: 'Asia/Riyadh'
+  });
   await supabase.from("login_attempts")
     .update({
       attempts: 0,
       lock_until: null,
-      last_attempt_time: null
+      last_attempt_time: null,
+      last_successful_login: saudiTime
     })
     .eq("email", email);
 }
