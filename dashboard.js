@@ -199,10 +199,19 @@ async function encryptAndSendFile() {
 
     const fileName = `${Date.now()}_${file.name}`;
 
-    // Upload file to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("files")
-      .upload(fileName, file);
+    // Encrypt file BEFORE upload
+const { encrypted, iv } = await encryptFile(file);
+
+// Combine IV + encrypted data
+const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
+combined.set(iv, 0);
+combined.set(new Uint8Array(encrypted), iv.byteLength);
+
+// Upload encrypted file
+const { data: uploadData, error: uploadError } = await supabase.storage
+  .from("files")
+  .upload(fileName, combined.buffer);
+
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
@@ -374,25 +383,31 @@ async function loadReceivedFiles() {
 // Download file
 async function downloadFile(path, fileName) {
   try {
-    const { data, error } = await supabase.storage
-      .from("files")
-      .download(path);
+    const { data, error } = await supabase.storage.from("files").download(path);
+    if (error) return showMessage("Error downloading file: " + error.message);
 
-    if (error) {
-      showMessage("Error downloading file: " + error.message);
-      return;
-    }
+    const arrayBuffer = await data.arrayBuffer();
 
-    const url = URL.createObjectURL(data);
+    // Extract IV (first 12 bytes)
+    const iv = arrayBuffer.slice(0, 12);
+
+    // Extract encrypted content
+    const encrypted = arrayBuffer.slice(12);
+
+    // Decrypt
+    const blob = await decryptFile(encrypted, iv);
+
+    // Download
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = fileName;
-    document.body.appendChild(a);
     a.click();
-    a.remove();
+
     URL.revokeObjectURL(url);
+
   } catch (err) {
-    showMessage("Download error: " + err.message);
+    showMessage("Decrypt error: " + err.message);
   }
 }
 
