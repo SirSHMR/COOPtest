@@ -86,6 +86,23 @@ async function resetAttempts(email) {
     .eq("email", email);
 }
 
+// Record successful login
+async function recordSuccessLogin(email) {
+  const saudi = new Date().toLocaleString('en-SA', {
+    timeZone: 'Asia/Riyadh'
+  });
+
+  const { data, error } = await supabase
+    .from("login_success_log")
+    .insert({
+      email: email,
+      login_time: saudi
+    });
+
+  if (error) console.error("Error saving login success:", error);
+}
+
+
 // =====================================================
 // Login Function
 // =====================================================
