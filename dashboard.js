@@ -292,7 +292,6 @@ async function encryptAndSendFile() {
 }
 
 // Load received files
-// Load received files
 async function loadReceivedFiles() {
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -304,7 +303,7 @@ async function loadReceivedFiles() {
 
     const currentUser = userData.user;
 
-    // الحصول على الملفات مع الأسماء المخزنة مباشرة
+    // Get files where current user is either recipient or sender
     const { data: files, error } = await supabase
       .from("shared_files")
       .select("*")
@@ -325,14 +324,25 @@ async function loadReceivedFiles() {
       return;
     }
 
-    // فصل الملفات المستلمة عن الملفات المرسلة
+    // Get employee names separately
+    const { data: employees } = await supabase
+      .from("employees")
+      .select("id, name");
+
+    const employeeMap = {};
+    if (employees) {
+      employees.forEach(emp => {
+        employeeMap[emp.id] = emp.name;
+      });
+    }
+
+    // Separate received files from sent files
     const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
     const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
 
-    // عرض الملفات المستلمة
     if (receivedFiles.length > 0) {
       const receivedHeader = document.createElement("h3");
-      receivedHeader.textContent = "📥 Received Files";
+      receivedHeader.textContent = "Received Files";
       receivedHeader.style.marginTop = "20px";
       receivedHeader.style.color = "#333";
       receivedList.appendChild(receivedHeader);
@@ -342,32 +352,32 @@ async function loadReceivedFiles() {
         div.className = "file-item";
         div.innerHTML = `
           <div>
-            <strong>📄 ${file.file_name}</strong><br />
-            <small>👤 Sent by: ${file.uploaded_by_name || 'Unknown User'} • 📅 ${formatDate(file.created_at)}</small>
+            <strong>${file.file_name}</strong><br />
+            <small>Received: ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">📥 Download</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
     }
 
-    // عرض الملفات المرسلة
     if (sentFiles.length > 0) {
       const sentHeader = document.createElement("h3");
-      sentHeader.textContent = "📤 Sent Files";
+      sentHeader.textContent = "Sent Files";
       sentHeader.style.marginTop = "20px";
       sentHeader.style.color = "#333";
       receivedList.appendChild(sentHeader);
 
       sentFiles.forEach(file => {
+        const employeeName = employeeMap[file.allowed_user_id] || 'Employee';
         const div = document.createElement("div");
         div.className = "file-item";
         div.innerHTML = `
           <div>
-            <strong>📄 ${file.file_name}</strong><br />
-            <small>👤 Sent to: ${file.allowed_user_name || 'Unknown Employee'} • 📅 ${formatDate(file.created_at)}</small>
+            <strong>${file.file_name}</strong><br />
+            <small>Sent to: ${employeeName} • ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">📥 Download</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
