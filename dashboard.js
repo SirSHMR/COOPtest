@@ -166,6 +166,31 @@ async function encryptAndSendFile() {
       showMessage("Please login again");
       return;
     }
+    // الحصول على اسم المستخدم الحالي من جدول employees
+    const { data: currentUserData, error: userDataError } = await supabase
+      .from("employees")
+      .select("id, name")
+      .eq("id", user.id)
+      .maybeSingle(); // استخدم maybeSingle بدلاً من single
+
+    let currentUserName = "Unknown User";
+    let currentUserId = user.id;
+
+    if (!userDataError && currentUserData) {
+      currentUserName = currentUserData.name;
+    } else {
+      // إذا لم يتم العثور على المستخدم، حاول البحث بالإيميل
+      const { data: userByEmail } = await supabase
+        .from("employees")
+        .select("id, name")
+        .eq("email", user.email)
+        .maybeSingle();
+      
+      if (userByEmail) {
+        currentUserName = userByEmail.name;
+        currentUserId = userByEmail.id;
+      }
+    }
 
     const fileName = `${Date.now()}_${file.name}`;
 
@@ -193,32 +218,42 @@ const { data: uploadData, error: uploadError } = await supabase.storage
     }
 
     // Get all employees if "Send to All" is selected
-    let employeeIds = [];
+    let employeesData = [];
     if (sendToAll) {
       const { data: allEmployees, error: empError } = await supabase
         .from("employees")
-        .select("id");
+        .select("id, name");
       
       if (empError) {
         showMessage("Error fetching employees: " + empError.message);
         return;
       }
       
-      employeeIds = allEmployees.map(emp => emp.id);
+      employeesData = allEmployees;
     } else {
-      employeeIds = selectedEmployees;
+      const { data: selectedEmployeesData, error: selectedError } = await supabase
+        .from("employees")
+        .select("id, name")
+        .in("id", selectedEmployees);
+      
+      if (selectedError) {
+        showMessage("Error fetching selected employees: " + selectedError.message);
+        return;
+      }
+      
+      employeesData = selectedEmployeesData;
     }
 
-    // Save data in shared_files for each employee
-    const currentUser = user.id;
-    const fileRecords = employeeIds.map(employeeId => ({
+    // حفظ البيانات في جدول shared_files مع الأسماء
+    const fileRecords = employeesData.map(employee => ({
       file_name: file.name,
       storage_path: uploadData.path,
-      allowed_user_id: employeeId,
-      uploaded_by: currentUser,
+      allowed_user_id: employee.id,
+      allowed_user_name: employee.name, // اسم المستقبل
+      uploaded_by: currentUserId,
+      uploaded_by_name: currentUserName, // اسم المرسل
       created_at: saudi,
     }));
-
     // Insert records into shared_files table
     const { error: dbError } = await supabase
       .from("shared_files")
