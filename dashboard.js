@@ -167,39 +167,24 @@ async function encryptAndSendFile() {
       return;
     }
 
-    // الحصول على اسم المستخدم الحالي
-    const { data: currentUserData, error: userDataError } = await supabase
-      .from("employees")
-      .select("id, name")
-      .eq("email", user.email)  // البحث بالإيميل أكثر أماناً
-      .maybeSingle();
-
-    let currentUserName = "Unknown User";
-    let currentUserId = user.id;
-
-    if (!userDataError && currentUserData) {
-      currentUserName = currentUserData.name;
-      currentUserId = currentUserData.id;
-    }
-
     const fileName = `${Date.now()}_${file.name}`;
 
-    // تشفير الملف
-    const { encrypted, iv } = await encryptFile(file);
+    // Encrypt file BEFORE upload
+const { encrypted, iv } = await encryptFile(file);
 
-    // دمج IV مع البيانات المشفرة
-    const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
-    combined.set(iv, 0);
-    combined.set(new Uint8Array(encrypted), iv.byteLength);
+// Combine IV + encrypted data
+const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
+combined.set(iv, 0);
+combined.set(new Uint8Array(encrypted), iv.byteLength);
 
-    // رفع الملف المشفر
-    const saudi = new Date().toLocaleString('en-SA', {
-      timeZone: 'Asia/Riyadh'
-    });
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("files")
-      .upload(fileName, combined.buffer);
+// Upload encrypted file
+const saudi = new Date().toLocaleString('en-SA', {
+    timeZone: 'Asia/Riyadh'
+  });
+const { data: uploadData, error: uploadError } = await supabase.storage
+  .from("files")
+  .upload(fileName, combined.buffer);
+
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
@@ -207,45 +192,34 @@ async function encryptAndSendFile() {
       return;
     }
 
-    // الحصول على بيانات الموظفين المحددين
-    let employeesData = [];
+    // Get all employees if "Send to All" is selected
+    let employeeIds = [];
     if (sendToAll) {
       const { data: allEmployees, error: empError } = await supabase
         .from("employees")
-        .select("id, name");
+        .select("id");
       
       if (empError) {
         showMessage("Error fetching employees: " + empError.message);
         return;
       }
       
-      employeesData = allEmployees;
+      employeeIds = allEmployees.map(emp => emp.id);
     } else {
-      const { data: selectedEmployeesData, error: selectedError } = await supabase
-        .from("employees")
-        .select("id, name")
-        .in("id", selectedEmployees);
-      
-      if (selectedError) {
-        showMessage("Error fetching selected employees: " + selectedError.message);
-        return;
-      }
-      
-      employeesData = selectedEmployeesData;
+      employeeIds = selectedEmployees;
     }
 
-    // حفظ البيانات في جدول shared_files مع الأسماء
-    const fileRecords = employeesData.map(employee => ({
+    // Save data in shared_files for each employee
+    const currentUser = user.id;
+    const fileRecords = employeeIds.map(employeeId => ({
       file_name: file.name,
       storage_path: uploadData.path,
-      allowed_user_id: employee.id,
-      allowed_user_name: employee.name, // اسم المستقبل
-      uploaded_by: currentUserId,
-      uploaded_by_name: currentUserName, // اسم المرسل
+      allowed_user_id: employeeId,
+      uploaded_by: currentUser,
       created_at: saudi,
     }));
 
-    // إدخال السجلات في الجدول
+    // Insert records into shared_files table
     const { error: dbError } = await supabase
       .from("shared_files")
       .insert(fileRecords);
@@ -253,14 +227,16 @@ async function encryptAndSendFile() {
     if (dbError) {
       console.error("Database error:", dbError);
       showMessage("Database error: " + dbError.message);
+      
+      // Try to delete the uploaded file if DB insertion fails
       await supabase.storage.from("files").remove([uploadData.path]);
       return;
     }
 
-    showMessage(`File sent successfully to ${employeesData.length} employee(s)!`, "success");
+    showMessage(`File sent successfully to ${employeeIds.length} employee(s)!`, "success");
     fileInput.value = "";
     
-    // إعادة تعيين الخيارات
+    // Reset options
     selectAllCheckbox.checked = false;
     const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
     checkboxes.forEach(checkbox => {
@@ -268,7 +244,7 @@ async function encryptAndSendFile() {
       checkbox.disabled = false;
     });
 
-    // إعادة تحميل الملفات
+    // Reload received files
     setTimeout(() => {
       loadReceivedFiles();
     }, 1000);
@@ -282,8 +258,6 @@ async function encryptAndSendFile() {
 // Load received files
 async function loadReceivedFiles() {
   try {
-    console.log("🔄 Starting loadReceivedFiles...");
-    
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
       console.error("Auth error:", userError);
@@ -291,110 +265,90 @@ async function loadReceivedFiles() {
       return;
     }
 
-    const currentAuthUser = userData.user;
-    console.log("👤 Auth User ID:", currentAuthUser.id, "Email:", currentAuthUser.email);
+    const currentUser = userData.user;
 
-    // البحث عن الموظف باستخدام البريد الإلكتروني
-    const { data: currentEmployee, error: empError } = await supabase
-      .from("employees")
-      .select("id, name")
-      .eq("email", currentAuthUser.email)
-      .maybeSingle();
-
-    if (empError || !currentEmployee) {
-      console.error("❌ Employee not found for email:", currentAuthUser.email);
-      showMessage("Error: Your account is not found in employees list");
-      return;
-    }
-
-    console.log("✅ Found Employee:", currentEmployee);
-
-    const currentEmployeeId = currentEmployee.id;
-    console.log("🔍 Searching files for employee ID:", currentEmployeeId);
-
-    // البحث في shared_files باستخدام employee ID
+    // Get files where current user is either recipient or sender
     const { data: files, error } = await supabase
       .from("shared_files")
       .select("*")
-      .or(`allowed_user_id.eq.${currentEmployeeId},uploaded_by.eq.${currentEmployeeId}`)
+      .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error("❌ Error loading files:", error);
+      console.error("Error loading files:", error);
       showMessage("Error loading files: " + error.message);
       return;
     }
-
-    console.log("📁 Files found:", files);
 
     const receivedList = document.getElementById("receivedList");
     receivedList.innerHTML = "";
 
     if (!files || files.length === 0) {
-      receivedList.innerHTML = "<p>No files found.</p>";
-      console.log("ℹ️ No files found for employee ID:", currentEmployeeId);
+      receivedList.innerHTML = "<p>No files received yet.</p>";
       return;
     }
 
-    // فصل الملفات المستلمة عن المرسلة
-    const receivedFiles = files.filter(file => file.allowed_user_id === currentEmployeeId);
-    const sentFiles = files.filter(file => file.uploaded_by === currentEmployeeId);
+    // Get employee names separately
+    const { data: employees } = await supabase
+      .from("employees")
+      .select("id, name");
 
-    console.log("📥 Received files:", receivedFiles);
-    console.log("📤 Sent files:", sentFiles);
+    const employeeMap = {};
+    if (employees) {
+      employees.forEach(emp => {
+        employeeMap[emp.id] = emp.name;
+      });
+    }
 
-    // عرض الملفات المستلمة
+    // Separate received files from sent files
+    const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
+    const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
+
     if (receivedFiles.length > 0) {
       const receivedHeader = document.createElement("h3");
-      receivedHeader.textContent = "📥 Received Files";
+      receivedHeader.textContent = "Received Files";
       receivedHeader.style.marginTop = "20px";
       receivedHeader.style.color = "#333";
       receivedList.appendChild(receivedHeader);
 
       receivedFiles.forEach(file => {
-        const senderName = file.uploaded_by_name || 'Unknown User';
         const div = document.createElement("div");
         div.className = "file-item";
         div.innerHTML = `
           <div>
-            <strong>📄 ${file.file_name}</strong><br />
-            <small>👤 Sent by: ${senderName} • 📅 ${formatDate(file.created_at)}</small>
+            <strong>${file.file_name}</strong><br />
+            <small>Received: ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">📥 Download</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
-    } else {
-      console.log("ℹ️ No received files");
     }
 
-    // عرض الملفات المرسلة
     if (sentFiles.length > 0) {
       const sentHeader = document.createElement("h3");
-      sentHeader.textContent = "📤 Sent Files";
+      sentHeader.textContent = "Sent Files";
       sentHeader.style.marginTop = "20px";
       sentHeader.style.color = "#333";
       receivedList.appendChild(sentHeader);
 
       sentFiles.forEach(file => {
-        const receiverName = file.allowed_user_name || 'Employee';
+        const employeeName = employeeMap[file.allowed_user_id] || 'Employee';
         const div = document.createElement("div");
         div.className = "file-item";
         div.innerHTML = `
           <div>
-            <strong>📄 ${file.file_name}</strong><br />
-            <small>👤 Sent to: ${receiverName} • 📅 ${formatDate(file.created_at)}</small>
+            <strong>${file.file_name}</strong><br />
+            <small>Sent to: ${employeeName} • ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">📥 Download</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
-    } else {
-      console.log("ℹ️ No sent files");
     }
 
   } catch (err) {
-    console.error("❌ Unexpected error in loadReceivedFiles:", err);
+    console.error("Unexpected error in loadReceivedFiles:", err);
     showMessage("Error loading files");
   }
 }
