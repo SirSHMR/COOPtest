@@ -21,7 +21,7 @@ async function getUserKey() {
 
   if (!keyBase64) {
     const newKey = await crypto.subtle.generateKey(
-      { name: "AES-GCM", length: 256 },
+      { name: "AES-GGCM", length: 256 },
       true,
       ["encrypt", "decrypt"]
     );
@@ -170,21 +170,21 @@ async function encryptAndSendFile() {
     const fileName = `${Date.now()}_${file.name}`;
 
     // Encrypt file BEFORE upload
-const { encrypted, iv } = await encryptFile(file);
+    const { encrypted, iv } = await encryptFile(file);
 
-// Combine IV + encrypted data
-const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
-combined.set(iv, 0);
-combined.set(new Uint8Array(encrypted), iv.byteLength);
+    // Combine IV + encrypted data
+    const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
+    combined.set(iv, 0);
+    combined.set(new Uint8Array(encrypted), iv.byteLength);
 
-// Upload encrypted file
-const saudi = new Date().toLocaleString('en-SA', {
-    timeZone: 'Asia/Riyadh'
-  });
-const { data: uploadData, error: uploadError } = await supabase.storage
-  .from("files")
-  .upload(fileName, combined.buffer);
+    // Upload encrypted file
+    const saudi = new Date().toLocaleString('en-SA', {
+      timeZone: 'Asia/Riyadh'
+    });
 
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("files")
+      .upload(fileName, combined.buffer);
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
@@ -267,7 +267,6 @@ async function loadReceivedFiles() {
 
     const currentUser = userData.user;
 
-    // Get files where current user is either recipient or sender
     const { data: files, error } = await supabase
       .from("shared_files")
       .select("*")
@@ -288,12 +287,12 @@ async function loadReceivedFiles() {
       return;
     }
 
-    // Get employee names separately
+    // UID  
     const { data: employees } = await supabase
       .from("employees")
       .select("id, name");
 
-    const employeeMap = {};
+    const employeeMap = {}; // uid → name
     if (employees) {
       employees.forEach(emp => {
         employeeMap[emp.id] = emp.name;
@@ -312,12 +311,13 @@ async function loadReceivedFiles() {
       receivedList.appendChild(receivedHeader);
 
       receivedFiles.forEach(file => {
+        const senderName = employeeMap[file.uploaded_by] || "Unknown";
         const div = document.createElement("div");
         div.className = "file-item";
         div.innerHTML = `
           <div>
             <strong>${file.file_name}</strong><br />
-            <small>Received: ${formatDate(file.created_at)}</small>
+            <small>From: ${senderName} • ${formatDate(file.created_at)}</small>
           </div>
           <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
@@ -361,16 +361,11 @@ async function downloadFile(path, fileName) {
 
     const arrayBuffer = await data.arrayBuffer();
 
-    // Extract IV (first 12 bytes)
     const iv = arrayBuffer.slice(0, 12);
-
-    // Extract encrypted content
     const encrypted = arrayBuffer.slice(12);
 
-    // Decrypt
     const blob = await decryptFile(encrypted, iv);
 
-    // Download
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -393,7 +388,6 @@ async function logout() {
 // On page load
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       window.location.href = "index.html";
@@ -403,11 +397,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadEmployees();
     await loadReceivedFiles();
 
-    // Add event listeners
     document.getElementById("encryptBtn").addEventListener("click", encryptAndSendFile);
     document.getElementById("logoutBtn").addEventListener("click", logout);
     
-    // Add event for "Send to All Employees" option
     document.getElementById("selectAllEmployees").addEventListener("change", function() {
       const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
       checkboxes.forEach(checkbox => {
