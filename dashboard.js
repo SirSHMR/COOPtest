@@ -166,6 +166,7 @@ async function encryptAndSendFile() {
       showMessage("Please login again");
       return;
     }
+
     // الحصول على اسم المستخدم الحالي من جدول employees
     const { data: currentUserData, error: userDataError } = await supabase
       .from("employees")
@@ -194,7 +195,7 @@ async function encryptAndSendFile() {
 
     const fileName = `${Date.now()}_${file.name}`;
 
-    // Encrypt file BEFORE upload
+// Encrypt file BEFORE upload
 const { encrypted, iv } = await encryptFile(file);
 
 // Combine IV + encrypted data
@@ -218,7 +219,7 @@ const { data: uploadData, error: uploadError } = await supabase.storage
     }
 
     // Get all employees if "Send to All" is selected
-    let employeesData = [];
+    let employeeIds = [];
     if (sendToAll) {
       const { data: allEmployees, error: empError } = await supabase
         .from("employees")
@@ -229,22 +230,12 @@ const { data: uploadData, error: uploadError } = await supabase.storage
         return;
       }
       
-      employeesData = allEmployees;
+      employeeIds = allEmployees.map(emp => emp.id);
     } else {
-      const { data: selectedEmployeesData, error: selectedError } = await supabase
-        .from("employees")
-        .select("id, name")
-        .in("id", selectedEmployees);
-      
-      if (selectedError) {
-        showMessage("Error fetching selected employees: " + selectedError.message);
-        return;
-      }
-      
-      employeesData = selectedEmployeesData;
+      employeeIds = selectedEmployees;
     }
 
-    // حفظ البيانات في جدول shared_files مع الأسماء
+    // Save data in shared_files for each employee
     const fileRecords = employeesData.map(employee => ({
       file_name: file.name,
       storage_path: uploadData.path,
@@ -254,6 +245,7 @@ const { data: uploadData, error: uploadError } = await supabase.storage
       uploaded_by_name: currentUserName, // اسم المرسل
       created_at: saudi,
     }));
+
     // Insert records into shared_files table
     const { error: dbError } = await supabase
       .from("shared_files")
