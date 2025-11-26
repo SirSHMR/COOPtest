@@ -143,6 +143,7 @@ async function loginUser() {
 
     if (data.user) {
       await resetAttempts(email);
+      await recordSuccessLogin(email);
       showMessage("Login successful! Redirecting...", "success");
 
       setTimeout(() => {
