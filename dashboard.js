@@ -167,32 +167,6 @@ async function encryptAndSendFile() {
       return;
     }
 
-    // الحصول على اسم المستخدم الحالي من جدول employees
-    const { data: currentUserData, error: userDataError } = await supabase
-      .from("employees")
-      .select("id, name")
-      .eq("id", user.id)
-      .maybeSingle(); // استخدم maybeSingle بدلاً من single
-
-    let currentUserName = "Unknown User";
-    let currentUserId = user.id;
-
-    if (!userDataError && currentUserData) {
-      currentUserName = currentUserData.name;
-    } else {
-      // إذا لم يتم العثور على المستخدم، حاول البحث بالإيميل
-      const { data: userByEmail } = await supabase
-        .from("employees")
-        .select("id, name")
-        .eq("email", user.email)
-        .maybeSingle();
-      
-      if (userByEmail) {
-        currentUserName = userByEmail.name;
-        currentUserId = userByEmail.id;
-      }
-    }
-
     const fileName = `${Date.now()}_${file.name}`;
 
     // Encrypt file BEFORE upload
@@ -223,7 +197,7 @@ const { data: uploadData, error: uploadError } = await supabase.storage
     if (sendToAll) {
       const { data: allEmployees, error: empError } = await supabase
         .from("employees")
-        .select("id, name");
+        .select("id");
       
       if (empError) {
         showMessage("Error fetching employees: " + empError.message);
@@ -235,16 +209,15 @@ const { data: uploadData, error: uploadError } = await supabase.storage
       employeeIds = selectedEmployees;
     }
 
+    // Save data in shared_files for each employee
+    const currentUser = user.id;
     const fileRecords = employeeIds.map(employeeId => ({
       file_name: file.name,
       storage_path: uploadData.path,
-      allowed_user_id: employee.id,
-      allowed_user_name: employee.name, // اسم المستقبل
-      uploaded_by: currentUserId,
-      uploaded_by_name: currentUserName, // اسم المرسل
+      allowed_user_id: employeeId,
+      uploaded_by: currentUser,
       created_at: saudi,
     }));
-
 
     // Insert records into shared_files table
     const { error: dbError } = await supabase
