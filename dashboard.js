@@ -470,3 +470,39 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Make functions available globally
 window.downloadFile = downloadFile;
+
+
+// دالة لفحص البيانات
+async function debugData() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log("🔍 DEBUG - Auth User:", user);
+
+    // التحقق من employee
+    const { data: employee } = await supabase
+      .from("employees")
+      .select("id, name, email")
+      .eq("email", user.email)
+      .single();
+    console.log("🔍 DEBUG - Employee Data:", employee);
+
+    // التحقق من الملفات في shared_files
+    const { data: allFiles } = await supabase
+      .from("shared_files")
+      .select("*")
+      .limit(10);
+    console.log("🔍 DEBUG - All Files in shared_files:", allFiles);
+
+    if (employee) {
+      // التحقق من الملفات المرسلة لهذا الموظف
+      const { data: userFiles } = await supabase
+        .from("shared_files")
+        .select("*")
+        .or(`allowed_user_id.eq.${employee.id},uploaded_by.eq.${employee.id}`);
+      console.log("🔍 DEBUG - Files for this employee:", userFiles);
+    }
+
+  } catch (error) {
+    console.error("DEBUG Error:", error);
+  }
+}
