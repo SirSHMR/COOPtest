@@ -195,7 +195,7 @@ async function encryptAndSendFile() {
 
     const fileName = `${Date.now()}_${file.name}`;
 
-// Encrypt file BEFORE upload
+    // Encrypt file BEFORE upload
 const { encrypted, iv } = await encryptFile(file);
 
 // Combine IV + encrypted data
@@ -219,37 +219,11 @@ const { data: uploadData, error: uploadError } = await supabase.storage
     }
 
     // Get all employees if "Send to All" is selected
-    let employeesData = [];
-    if (sendToAll) {
-      const { data: allEmployees, error: empError } = await supabase
-        .from("employees")
-        .select("id, name");
-      
-      if (empError) {
-        showMessage("Error fetching employees: " + empError.message);
-        return;
-      }
-      
-      employeesData = allEmployees;
-    } else {
-      const { data: selectedEmployeesData, error: selectedError } = await supabase
-        .from("employees")
-        .select("id, name")
-        .in("id", selectedEmployees);
-      
-      if (selectedError) {
-        showMessage("Error fetching selected employees: " + selectedError.message);
-        return;
-      }
-      
-      employeesData = selectedEmployeesData;
-    }
-    
     let employeeIds = [];
     if (sendToAll) {
       const { data: allEmployees, error: empError } = await supabase
         .from("employees")
-        .select("id);
+        .select("id, name");
       
       if (empError) {
         showMessage("Error fetching employees: " + empError.message);
@@ -262,6 +236,7 @@ const { data: uploadData, error: uploadError } = await supabase.storage
     }
 
     // Save data in shared_files for each employee
+    const currentUser = user.id;
     const fileRecords = employeesData.map(employee => ({
       file_name: file.name,
       storage_path: uploadData.path,
