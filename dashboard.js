@@ -289,13 +289,28 @@ async function loadReceivedFiles() {
       return;
     }
 
-    const currentUser = userData.user;
+    const currentAuthUser = userData.user;
 
-    // Get files where current user is either recipient or sender
+    // أولاً: الحصول على employee ID الخاص بالمستخدم الحالي
+    const { data: currentEmployee, error: empError } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("email", currentAuthUser.email)
+      .maybeSingle();
+
+    if (empError || !currentEmployee) {
+      console.error("Employee not found for user:", currentAuthUser.email);
+      showMessage("Error: Your account is not found in employees list");
+      return;
+    }
+
+    const currentEmployeeId = currentEmployee.id;
+
+    // الآن استخدم employee ID للبحث في shared_files
     const { data: files, error } = await supabase
       .from("shared_files")
       .select("*")
-      .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
+      .or(`allowed_user_id.eq.${currentEmployeeId},uploaded_by.eq.${currentEmployeeId}`)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -325,8 +340,8 @@ async function loadReceivedFiles() {
     }
 
     // Separate received files from sent files
-    const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
-    const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
+    const receivedFiles = files.filter(file => file.allowed_user_id === currentEmployeeId);
+    const sentFiles = files.filter(file => file.uploaded_by === currentEmployeeId);
 
     if (receivedFiles.length > 0) {
       const receivedHeader = document.createElement("h3");
@@ -336,12 +351,13 @@ async function loadReceivedFiles() {
       receivedList.appendChild(receivedHeader);
 
       receivedFiles.forEach(file => {
+        const senderName = file.uploaded_by_name || employeeMap[file.uploaded_by] || 'Unknown User';
         const div = document.createElement("div");
         div.className = "file-item";
         div.innerHTML = `
           <div>
             <strong>${file.file_name}</strong><br />
-            <small>Received: ${formatDate(file.created_at)}</small>
+            <small>Sent by: ${senderName} • Received: ${formatDate(file.created_at)}</small>
           </div>
           <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
@@ -357,13 +373,13 @@ async function loadReceivedFiles() {
       receivedList.appendChild(sentHeader);
 
       sentFiles.forEach(file => {
-        const employeeName = employeeMap[file.allowed_user_id] || 'Employee';
+        const receiverName = file.allowed_user_name || employeeMap[file.allowed_user_id] || 'Employee';
         const div = document.createElement("div");
         div.className = "file-item";
         div.innerHTML = `
           <div>
             <strong>${file.file_name}</strong><br />
-            <small>Sent to: ${employeeName} • ${formatDate(file.created_at)}</small>
+            <small>Sent to: ${receiverName} • ${formatDate(file.created_at)}</small>
           </div>
           <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
