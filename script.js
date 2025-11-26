@@ -18,7 +18,7 @@ function showMessage(text, type = "error") {
 }
 
 // =====================================================
-// Helper: Get login attempts for user
+// Helper: Get login attempts
 // =====================================================
 async function getAttempts(email) {
   const { data, error } = await supabase
@@ -31,7 +31,6 @@ async function getAttempts(email) {
     console.error("Error fetching attempts:", error);
     return null;
   }
-
   return data;
 }
 
@@ -40,9 +39,7 @@ async function getAttempts(email) {
 // =====================================================
 async function registerFail(email) {
   const user = await getAttempts(email);
-  const now = new Date().toLocaleString('en-SA', {
-    timeZone: 'Asia/Riyadh'
-  });
+  const now = new Date().toLocaleString('en-SA', { timeZone: 'Asia/Riyadh' });
 
   let attempts = 1;
   let lockUntil = null;
@@ -51,34 +48,27 @@ async function registerFail(email) {
   if (user) {
     attempts = user.attempts + 1;
 
-    // إذا وصلت 3 محاولات → حظر
     if (attempts >= 3) {
-      const now = Date.now();
-      const baseDuration = 5 * 60 * 1000; // 5 دقائق
-
-      // إذا كان عنده حظر سابق → تضاعف المدة
+      const nowMs = Date.now();
+      const baseDuration = 5 * 60 * 1000;
       const multiplier = Math.pow(2, attempts - 3);
       const ban = baseDuration * multiplier;
       lockMinutes = 5 * multiplier;
-      lockUntil = now + ban;
+      lockUntil = nowMs + ban;
     }
-  } else {
-    // أول محاولة خطأ
-    attempts = 1;
   }
 
-  await supabase.from("login_attempts")
-    .upsert({
-      email: email,
-      attempts: attempts,
-      lock_until: lockUntil,
-      lock_minutes: lockMinutes,
-      last_attempt_time: now
-    });
+  await supabase.from("login_attempts").upsert({
+    email,
+    attempts,
+    lock_until: lockUntil,
+    lock_minutes: lockMinutes,
+    last_attempt_time: now
+  });
 }
 
 // =====================================================
-// Helper: Reset attempts on successful login
+// Helper: Reset attempts on success
 // =====================================================
 async function resetAttempts(email) {
   await supabase.from("login_attempts")
@@ -86,13 +76,15 @@ async function resetAttempts(email) {
     .eq("email", email);
 }
 
-// Record successful login
+// =====================================================
+// Helper: Record Successful Login  
+// =====================================================
 async function recordSuccessLogin(email) {
   const saudi = new Date().toLocaleString('en-SA', {
     timeZone: 'Asia/Riyadh'
   });
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("login_success_log")
     .insert({
       email: email,
@@ -101,7 +93,6 @@ async function recordSuccessLogin(email) {
 
   if (error) console.error("Error saving login success:", error);
 }
-
 
 // =====================================================
 // Login Function
@@ -115,20 +106,14 @@ async function loginUser() {
     return;
   }
 
-  // =============================
-  // Check if user is locked
-  // =============================
   const user = await getAttempts(email);
 
   if (user && user.lock_until && Date.now() < user.lock_until) {
-    const remaining = Math.ceil((user.lock_until - Date.now()) / 60000); // دقائق
+    const remaining = Math.ceil((user.lock_until - Date.now()) / 60000);
     showMessage(`Too many attempts. Try again after ${remaining} minutes.`);
     return;
   }
 
-  // =============================
-  // Try login
-  // =============================
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -143,13 +128,16 @@ async function loginUser() {
 
     if (data.user) {
       await resetAttempts(email);
+
       await recordSuccessLogin(email);
+
       showMessage("Login successful! Redirecting...", "success");
 
       setTimeout(() => {
         window.location.href = "dashboard.html";
       }, 1500);
     }
+
   } catch (err) {
     console.error(err);
     showMessage("Network error. Please try again.");
