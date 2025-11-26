@@ -149,7 +149,6 @@ function getSelectedEmployees() {
 
 
 // Send file
-// Send file
 async function encryptAndSendFile() {
   const fileInput = document.getElementById('fileInput');
   const selectAllCheckbox = document.getElementById('selectAllEmployees');
@@ -168,30 +167,19 @@ async function encryptAndSendFile() {
       return;
     }
 
-    // الحصول على اسم المستخدم الحالي من جدول employees
+    // الحصول على اسم المستخدم الحالي
     const { data: currentUserData, error: userDataError } = await supabase
       .from("employees")
       .select("id, name")
-      .eq("id", user.id)
-      .maybeSingle(); // استخدم maybeSingle بدلاً من single
+      .eq("email", user.email)  // البحث بالإيميل أكثر أماناً
+      .maybeSingle();
 
     let currentUserName = "Unknown User";
     let currentUserId = user.id;
 
     if (!userDataError && currentUserData) {
       currentUserName = currentUserData.name;
-    } else {
-      // إذا لم يتم العثور على المستخدم، حاول البحث بالإيميل
-      const { data: userByEmail } = await supabase
-        .from("employees")
-        .select("id, name")
-        .eq("email", user.email)
-        .maybeSingle();
-      
-      if (userByEmail) {
-        currentUserName = userByEmail.name;
-        currentUserId = userByEmail.id;
-      }
+      currentUserId = currentUserData.id;
     }
 
     const fileName = `${Date.now()}_${file.name}`;
@@ -292,11 +280,8 @@ async function encryptAndSendFile() {
 }
 
 // Load received files
-// Load received files - نسخة معدلة
 async function loadReceivedFiles() {
   try {
-    console.log("🔍 Starting loadReceivedFiles...");
-    
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
       console.error("Auth error:", userError);
@@ -305,9 +290,8 @@ async function loadReceivedFiles() {
     }
 
     const currentUser = userData.user;
-    console.log("👤 Current user ID:", currentUser.id);
 
-    // استعلام أكثر دقة للحصول على الملفات
+    // Get files where current user is either recipient or sender
     const { data: files, error } = await supabase
       .from("shared_files")
       .select("*")
@@ -315,33 +299,38 @@ async function loadReceivedFiles() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error("❌ Error loading files:", error);
+      console.error("Error loading files:", error);
       showMessage("Error loading files: " + error.message);
       return;
     }
-
-    console.log("📁 Files found:", files);
 
     const receivedList = document.getElementById("receivedList");
     receivedList.innerHTML = "";
 
     if (!files || files.length === 0) {
-      receivedList.innerHTML = "<p>No files found.</p>";
-      console.log("ℹ️ No files found for user");
+      receivedList.innerHTML = "<p>No files received yet.</p>";
       return;
     }
 
-    // فصل الملفات المستلمة عن الملفات المرسلة
+    // Get employee names separately
+    const { data: employees } = await supabase
+      .from("employees")
+      .select("id, name");
+
+    const employeeMap = {};
+    if (employees) {
+      employees.forEach(emp => {
+        employeeMap[emp.id] = emp.name;
+      });
+    }
+
+    // Separate received files from sent files
     const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
     const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
 
-    console.log("📥 Received files:", receivedFiles);
-    console.log("📤 Sent files:", sentFiles);
-
-    // عرض الملفات المستلمة
     if (receivedFiles.length > 0) {
       const receivedHeader = document.createElement("h3");
-      receivedHeader.textContent = "📥 Received Files";
+      receivedHeader.textContent = "Received Files";
       receivedHeader.style.marginTop = "20px";
       receivedHeader.style.color = "#333";
       receivedList.appendChild(receivedHeader);
@@ -351,46 +340,43 @@ async function loadReceivedFiles() {
         div.className = "file-item";
         div.innerHTML = `
           <div>
-            <strong>📄 ${file.file_name}</strong><br />
-            <small>👤 Sent by: ${file.uploaded_by_name || 'Unknown User'} • 📅 ${formatDate(file.created_at)}</small>
+            <strong>${file.file_name}</strong><br />
+            <small>Received: ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">📥 Download</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
-    } else {
-      console.log("ℹ️ No received files found");
     }
 
-    // عرض الملفات المرسلة
     if (sentFiles.length > 0) {
       const sentHeader = document.createElement("h3");
-      sentHeader.textContent = "📤 Sent Files";
+      sentHeader.textContent = "Sent Files";
       sentHeader.style.marginTop = "20px";
       sentHeader.style.color = "#333";
       receivedList.appendChild(sentHeader);
 
       sentFiles.forEach(file => {
+        const employeeName = employeeMap[file.allowed_user_id] || 'Employee';
         const div = document.createElement("div");
         div.className = "file-item";
         div.innerHTML = `
           <div>
-            <strong>📄 ${file.file_name}</strong><br />
-            <small>👤 Sent to: ${file.allowed_user_name || 'Unknown Employee'} • 📅 ${formatDate(file.created_at)}</small>
+            <strong>${file.file_name}</strong><br />
+            <small>Sent to: ${employeeName} • ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">📥 Download</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
-    } else {
-      console.log("ℹ️ No sent files found");
     }
 
   } catch (err) {
-    console.error("❌ Unexpected error in loadReceivedFiles:", err);
+    console.error("Unexpected error in loadReceivedFiles:", err);
     showMessage("Error loading files");
   }
 }
+
 // Download file
 async function downloadFile(path, fileName) {
   try {
