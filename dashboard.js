@@ -206,7 +206,7 @@ const { data: uploadData, error: uploadError } = await supabase.storage
     if (sendToAll) {
       const { data: allEmployees, error: empError } = await supabase
         .from("employees")
-        .select("id");
+        .select("id,name");
       
       if (empError) {
         showMessage("Error fetching employees: " + empError.message);
