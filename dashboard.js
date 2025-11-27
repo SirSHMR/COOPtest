@@ -100,6 +100,9 @@ function formatDate(dateString) {
   });
 }
 
+// global employee name map
+let employeeMap = {};
+
 // Load employees list from employees table
 async function loadEmployees() {
   const employeesList = document.getElementById('employeesList');
