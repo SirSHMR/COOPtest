@@ -209,15 +209,45 @@ const { data: uploadData, error: uploadError } = await supabase.storage
       employeeIds = selectedEmployees;
     }
 
-    // Save data in shared_files for each employee
-    const currentUser = user.id;
-    const fileRecords = employeeIds.map(employeeId => ({
-      file_name: file.name,
-      storage_path: uploadData.path,
-      allowed_user_id: employeeId,
-      uploaded_by: currentUser,
-      created_at: saudi,
-    }));
+   // Get sender info from employees table
+const { data: senderData, error: senderError } = await supabase
+  .from("employees")
+  .select("id, name, email")
+  .eq("email", user.email)
+  .single();
+
+if (senderError || !senderData) {
+  showMessage("Sender not found in employees table");
+  return;
+}
+
+const fileRecords = [];
+
+for (const employeeId of employeeIds) {
+  
+  // Get receiver name
+  const { data: receiverData, error: receiverError } = await supabase
+    .from("employees")
+    .select("name")
+    .eq("id", employeeId)
+    .single();
+
+  if (receiverError) {
+    showMessage("Receiver not found: " + receiverError.message);
+    return;
+  }
+
+  fileRecords.push({
+    file_name: file.name,
+    storage_path: uploadData.path,
+    allowed_user_id: employeeId,
+    uploaded_by: senderData.id,
+    sender_name: senderData.name,
+    receiver_name: receiverData.name,
+    created_at: saudi,
+  });
+}
+
 
     // Insert records into shared_files table
     const { error: dbError } = await supabase
