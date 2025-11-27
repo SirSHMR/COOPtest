@@ -149,208 +149,171 @@ function getSelectedEmployees() {
 
 
 // Send file
+// ------------------------------
+// Encrypt & Send File Function
+// ------------------------------
 async function encryptAndSendFile() {
-  const fileInput = document.getElementById('fileInput');
-  const selectAllCheckbox = document.getElementById('selectAllEmployees');
-  
-  const file = fileInput.files[0];
-  const sendToAll = selectAllCheckbox.checked;
-  const selectedEmployees = getSelectedEmployees();
+const fileInput = document.getElementById('fileInput');
+const selectAllCheckbox = document.getElementById('selectAllEmployees');
 
-  if (!file) return showMessage("Please select a file");
-  if (!sendToAll && selectedEmployees.length === 0) return showMessage("Please select at least one employee");
+const file = fileInput.files[0];
+const sendToAll = selectAllCheckbox.checked;
 
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      showMessage("Please login again");
-      return;
-    }
+if (!file) return showMessage("Please select a file");
 
-    const fileName = `${Date.now()}_${file.name}`;
+// Get selected employees
+let selectedEmployees = [];
+if (!sendToAll) {
+const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
+checkboxes.forEach(cb => {
+if (cb.checked) selectedEmployees.push(cb.value);
+});
+if (selectedEmployees.length === 0) return showMessage("Please select at least one employee");
+}
 
-    // Encrypt file BEFORE upload
+try {
+const { data: { user }, error: userError } = await supabase.auth.getUser();
+if (userError || !user) return showMessage("Please login again");
+
+```
+const fileName = `${Date.now()}_${file.name}`;
+
+// Encrypt file
 const { encrypted, iv } = await encryptFile(file);
-
-// Combine IV + encrypted data
 const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
 combined.set(iv, 0);
 combined.set(new Uint8Array(encrypted), iv.byteLength);
 
-// Upload encrypted file
-const saudi = new Date().toLocaleString('en-SA', {
-    timeZone: 'Asia/Riyadh'
-  });
-const { data: uploadData, error: uploadError } = await supabase.storage
-  .from("files")
-  .upload(fileName, combined.buffer);
+// Upload file
+const saudi = new Date().toLocaleString('en-SA', { timeZone: 'Asia/Riyadh' });
+const { data: uploadData, error: uploadError } = await supabase.storage.from("files").upload(fileName, combined.buffer);
+if (uploadError) return showMessage("Upload error: " + uploadError.message);
 
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      showMessage("Upload error: " + uploadError.message);
-      return;
-    }
-
-    // Get all employees if "Send to All" is selected
-    let employeeIds = [];
-    if (sendToAll) {
-      const { data: allEmployees, error: empError } = await supabase
-        .from("employees")
-        .select("id");
-      
-      if (empError) {
-        showMessage("Error fetching employees: " + empError.message);
-        return;
-      }
-      
-      employeeIds = allEmployees.map(emp => emp.id);
-    } else {
-      employeeIds = selectedEmployees;
-    }
-
-    // Save data in shared_files for each employee
-    const currentUser = user.id;
-    const fileRecords = employeeIds.map(employeeId => ({
-      file_name: file.name,
-      storage_path: uploadData.path,
-      allowed_user_id: employeeId,
-      uploaded_by: currentUser,
-      created_at: saudi,
-    }));
-
-    // Insert records into shared_files table
-    const { error: dbError } = await supabase
-      .from("shared_files")
-      .insert(fileRecords);
-
-    if (dbError) {
-      console.error("Database error:", dbError);
-      showMessage("Database error: " + dbError.message);
-      
-      // Try to delete the uploaded file if DB insertion fails
-      await supabase.storage.from("files").remove([uploadData.path]);
-      return;
-    }
-
-    showMessage(`File sent successfully to ${employeeIds.length} employee(s)!`, "success");
-    fileInput.value = "";
-    
-    // Reset options
-    selectAllCheckbox.checked = false;
-    const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-      checkbox.checked = false;
-      checkbox.disabled = false;
-    });
-
-    // Reload received files
-    setTimeout(() => {
-      loadReceivedFiles();
-    }, 1000);
-  } 
-  catch (err) {
-    console.error("Unexpected error:", err);
-    showMessage("Unexpected error: " + err.message);
-  }
+// Get all employees if send to all
+let employeeIds = [];
+if (sendToAll) {
+  const { data: allEmployees, error: empError } = await supabase.from("employees").select("id, name");
+  if (empError) return showMessage("Error fetching employees: " + empError.message);
+  employeeIds = allEmployees.map(emp => emp.id);
+  var employeeMap = {};
+  allEmployees.forEach(emp => employeeMap[emp.id] = emp.name);
+} else {
+  employeeIds = selectedEmployees;
+  const { data: allEmployees } = await supabase.from("employees").select("id, name");
+  var employeeMap = {};
+  allEmployees.forEach(emp => employeeMap[emp.id] = emp.name);
 }
 
-// Load received files
+// Insert records in shared_files with names
+const fileRecords = employeeIds.map(empId => ({
+  file_name: file.name,
+  storage_path: uploadData.path,
+  allowed_user_id: empId,
+  allowed_user_name: employeeMap[empId] || 'Employee',
+  uploaded_by: user.id,
+  uploaded_by_name: user.user_metadata.name || 'Sender',
+  created_at: saudi
+}));
+
+const { error: dbError } = await supabase.from("shared_files").insert(fileRecords);
+if (dbError) {
+  // Delete uploaded file if DB insert fails
+  await supabase.storage.from("files").remove([uploadData.path]);
+  return showMessage("Database error: " + dbError.message);
+}
+
+showMessage(`File sent successfully to ${employeeIds.length} employee(s)!`, "success");
+fileInput.value = "";
+selectAllCheckbox.checked = false;
+document.querySelectorAll('.employee-checkbox input[type="checkbox"]').forEach(cb => {
+  cb.checked = false;
+  cb.disabled = false;
+});
+
+setTimeout(() => loadReceivedFiles(), 1000);
+```
+
+} catch (err) {
+showMessage("Unexpected error: " + err.message);
+}
+}
+
+// ------------------------------
+// Load Received and Sent Files Function
+// ------------------------------
 async function loadReceivedFiles() {
-  try {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      console.error("Auth error:", userError);
-      showMessage("Please login again");
-      return;
-    }
+try {
+const { data: userData, error: userError } = await supabase.auth.getUser();
+if (userError || !userData.user) return showMessage("Please login again");
 
-    const currentUser = userData.user;
+```
+const currentUser = userData.user;
 
-    // Get files where current user is either recipient or sender
-    const { data: files, error } = await supabase
-      .from("shared_files")
-      .select("*")
-      .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
-      .order('created_at', { ascending: false });
+const { data: files, error } = await supabase
+  .from("shared_files")
+  .select("*")
+  .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
+  .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("Error loading files:", error);
-      showMessage("Error loading files: " + error.message);
-      return;
-    }
+if (error) return showMessage("Error loading files: " + error.message);
 
-    const receivedList = document.getElementById("receivedList");
-    receivedList.innerHTML = "";
+const receivedList = document.getElementById("receivedList");
+receivedList.innerHTML = "";
 
-    if (!files || files.length === 0) {
-      receivedList.innerHTML = "<p>No files received yet.</p>";
-      return;
-    }
+if (!files || files.length === 0) {
+  receivedList.innerHTML = "<p>No files received yet.</p>";
+  return;
+}
 
-    // Get employee names separately
-    const { data: employees } = await supabase
-      .from("employees")
-      .select("id, name");
+// Separate received vs sent
+const receivedFiles = files.filter(f => f.allowed_user_id === currentUser.id);
+const sentFiles = files.filter(f => f.uploaded_by === currentUser.id);
 
-    const employeeMap = {};
-    if (employees) {
-      employees.forEach(emp => {
-        employeeMap[emp.id] = emp.name;
-      });
-    }
+if (receivedFiles.length > 0) {
+  const receivedHeader = document.createElement("h3");
+  receivedHeader.textContent = "Received Files";
+  receivedHeader.style.marginTop = "20px";
+  receivedList.appendChild(receivedHeader);
 
-    // Separate received files from sent files
-    const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
-    const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
+  receivedFiles.forEach(file => {
+    const div = document.createElement("div");
+    div.className = "file-item";
+    div.innerHTML = `
+      <div>
+        <strong>${file.file_name}</strong><br />
+        <small>From: ${file.uploaded_by_name} • Received: ${formatDate(file.created_at)}</small>
+      </div>
+      <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
+    `;
+    receivedList.appendChild(div);
+  });
+}
 
-    if (receivedFiles.length > 0) {
-      const receivedHeader = document.createElement("h3");
-      receivedHeader.textContent = "Received Files";
-      receivedHeader.style.marginTop = "20px";
-      receivedHeader.style.color = "#333";
-      receivedList.appendChild(receivedHeader);
+if (sentFiles.length > 0) {
+  const sentHeader = document.createElement("h3");
+  sentHeader.textContent = "Sent Files";
+  sentHeader.style.marginTop = "20px";
+  receivedList.appendChild(sentHeader);
 
-      receivedFiles.forEach(file => {
-        const div = document.createElement("div");
-        div.className = "file-item";
-        div.innerHTML = `
-          <div>
-            <strong>${file.file_name}</strong><br />
-            <small>Received: ${formatDate(file.created_at)}</small>
-          </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
-        `;
-        receivedList.appendChild(div);
-      });
-    }
+  sentFiles.forEach(file => {
+    const div = document.createElement("div");
+    div.className = "file-item";
+    div.innerHTML = `
+      <div>
+        <strong>${file.file_name}</strong><br />
+        <small>Sent to: ${file.allowed_user_name} • ${formatDate(file.created_at)}</small><br/>
+        <small>From: ${file.uploaded_by_name}</small>
+      </div>
+      <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
+    `;
+    receivedList.appendChild(div);
+  });
+}
+```
 
-    if (sentFiles.length > 0) {
-      const sentHeader = document.createElement("h3");
-      sentHeader.textContent = "Sent Files";
-      sentHeader.style.marginTop = "20px";
-      sentHeader.style.color = "#333";
-      receivedList.appendChild(sentHeader);
-
-      sentFiles.forEach(file => {
-        const employeeName = employeeMap[file.allowed_user_id] || 'Employee';
-        const div = document.createElement("div");
-        div.className = "file-item";
-        div.innerHTML = `
-          <div>
-            <strong>${file.file_name}</strong><br />
-            <small>Sent to: ${employeeName} • ${formatDate(file.created_at)}</small>
-          </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
-        `;
-        receivedList.appendChild(div);
-      });
-    }
-
-  } catch (err) {
-    console.error("Unexpected error in loadReceivedFiles:", err);
-    showMessage("Error loading files");
-  }
+} catch (err) {
+showMessage("Error loading files: " + err.message);
+}
 }
 
 // Download file
