@@ -148,6 +148,7 @@ function getSelectedEmployees() {
 }
 
 
+// Send file
 // ------------------------------
 // Encrypt & Send File Function
 // ------------------------------
@@ -310,6 +311,7 @@ if (sentFiles.length > 0) {
 showMessage("Error loading files: " + err.message);
 }
 }
+
 // Download file
 async function downloadFile(path, fileName) {
   try {
