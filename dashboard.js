@@ -100,9 +100,6 @@ function formatDate(dateString) {
   });
 }
 
-// global employee name map
-let employeeMap = {};
-
 // Load employees list from employees table
 async function loadEmployees() {
   const employeesList = document.getElementById('employeesList');
@@ -122,12 +119,6 @@ async function loadEmployees() {
     employeesList.innerHTML = '<p>No employees found</p>';
     return;
   }
-
-  // fill global map
-  employeeMap = {}; // reset
-  data.forEach(emp => {
-    employeeMap[emp.id] = emp.name;
-  });
 
   data.forEach(emp => {
     const div = document.createElement("div");
@@ -206,7 +197,7 @@ const { data: uploadData, error: uploadError } = await supabase.storage
     if (sendToAll) {
       const { data: allEmployees, error: empError } = await supabase
         .from("employees")
-        .select("id,name");
+        .select("id");
       
       if (empError) {
         showMessage("Error fetching employees: " + empError.message);
@@ -220,17 +211,13 @@ const { data: uploadData, error: uploadError } = await supabase.storage
 
     // Save data in shared_files for each employee
     const currentUser = user.id;
-    const senderName = user.name   || user.email   || "Unknown";
- 
     const fileRecords = employeeIds.map(employeeId => ({
-    file_name: file.name,
-    storage_path: uploadData.path,
-    allowed_user_id: employeeId,
-    uploaded_by: currentUser,
-    sender_name: user.name || user.email, 
-    receiver_name: employeeMap[employeeId] || null,
-    created_at: saudi,
-  }));
+      file_name: file.name,
+      storage_path: uploadData.path,
+      allowed_user_id: employeeId,
+      uploaded_by: currentUser,
+      created_at: saudi,
+    }));
 
     // Insert records into shared_files table
     const { error: dbError } = await supabase
