@@ -238,8 +238,6 @@ async function encryptAndSendFile() {
     const fileRecords = employeeData.map(employee => ({
       file_name: file.name,
       storage_path: uploadData.path,
-      allowed_user_id: employee.id,
-      uploaded_by: currentUser,
       created_at: saudi,
       sender_name: senderName,        // اسم المرسل
       receiver_name: employee.name    // اسم المستقبل
