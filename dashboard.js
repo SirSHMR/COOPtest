@@ -123,6 +123,12 @@ async function loadEmployees() {
     return;
   }
 
+  // fill global map
+  employeeMap = {}; // reset
+  data.forEach(emp => {
+    employeeMap[emp.id] = emp.name;
+  });
+
   data.forEach(emp => {
     const div = document.createElement("div");
     div.className = "employee-checkbox";
@@ -214,14 +220,14 @@ const { data: uploadData, error: uploadError } = await supabase.storage
 
     // Save data in shared_files for each employee
     const currentUser = user.id;
-    const senderName = employeeMap[currentUser]; 
+    const senderName = employeeMap[currentUser] || "Sender"; 
     const fileRecords = employeeIds.map(employeeId => ({
     file_name: file.name,
     storage_path: uploadData.path,
     allowed_user_id: employeeId,
     uploaded_by: currentUser,
     sender_name: senderName, 
-    receiver_name: employeeMap[employeeId], 
+    receiver_name: employeeMap[employeeId] || null,
     created_at: saudi,
   }));
 
