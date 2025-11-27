@@ -211,13 +211,15 @@ const { data: uploadData, error: uploadError } = await supabase.storage
 
     // Save data in shared_files for each employee
     const currentUser = user.id;
-    const fileRecords = employeeIds.map(employeeId => ({
-      file_name: file.name,
-      storage_path: uploadData.path,
-      allowed_user_id: employeeId,
-      uploaded_by: currentUser,
-      created_at: saudi,
-    }));
+    const senderName = employeeMap[currentUser]; // اسم المرسل
+    file_name: file.name,
+    storage_path: uploadData.path,
+    allowed_user_id: employeeId,
+    uploaded_by: currentUser,
+    sender_name: senderName,
+    receiver_name: employeeMap[employeeId],
+    created_at: saudi,
+  }));
 
     // Insert records into shared_files table
     const { error: dbError } = await supabase
