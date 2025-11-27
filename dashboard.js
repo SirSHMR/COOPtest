@@ -148,7 +148,6 @@ function getSelectedEmployees() {
 }
 
 
-// Send file
 // ------------------------------
 // Encrypt & Send File Function
 // ------------------------------
@@ -175,7 +174,6 @@ try {
 const { data: { user }, error: userError } = await supabase.auth.getUser();
 if (userError || !user) return showMessage("Please login again");
 
-```
 const fileName = `${Date.now()}_${file.name}`;
 
 // Encrypt file
@@ -231,7 +229,6 @@ document.querySelectorAll('.employee-checkbox input[type="checkbox"]').forEach(c
 });
 
 setTimeout(() => loadReceivedFiles(), 1000);
-```
 
 } catch (err) {
 showMessage("Unexpected error: " + err.message);
@@ -246,7 +243,6 @@ try {
 const { data: userData, error: userError } = await supabase.auth.getUser();
 if (userError || !userData.user) return showMessage("Please login again");
 
-```
 const currentUser = userData.user;
 
 const { data: files, error } = await supabase
@@ -309,13 +305,11 @@ if (sentFiles.length > 0) {
     receivedList.appendChild(div);
   });
 }
-```
 
 } catch (err) {
 showMessage("Error loading files: " + err.message);
 }
 }
-
 // Download file
 async function downloadFile(path, fileName) {
   try {
