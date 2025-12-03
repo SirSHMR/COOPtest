@@ -1,6 +1,6 @@
-// =============== نظام التشفير بالمفتاح المشترك + PIN ===============
+// --- AES Encryption Helpers (User-Specific Key) ---
 
-// تحويل ArrayBuffer ↔ Base64
+// Convert ArrayBuffer ↔ Base64
 function arrayBufferToBase64(buffer) {
   let binary = "";
   const bytes = new Uint8Array(buffer);
@@ -15,194 +15,68 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
-// --- المفتاح الرئيسي للشركة (مشتق من سر الشركة + PIN المستخدم) ---
-let companyMasterKey = null;
+// Generate and store user-specific AES key
+async function getUserKey() {
+  let keyBase64 = localStorage.getItem("user_aes_key");
 
-async function getCompanyMasterKey() {
-  if (companyMasterKey) return companyMasterKey;
-  
-  try {
-    // 1. الحصول على بيانات المستخدم الحالي
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("يجب تسجيل الدخول");
-    
-    // 2. الحصول على PIN الخاص بالموظف
-    const { data: employee } = await supabase
-      .from("employees")
-      .select("encryption_pin")
-      .eq("id", user.id)
-      .single();
-    
-    if (!employee || !employee.encryption_pin) {
-      // إذا لم يكن للموظف PIN، اطلب منه إنشاء واحد
-      await setupEmployeePIN();
-      return getCompanyMasterKey(); // إعادة المحاولة
-    }
-    
-    // 3. اشتقاق المفتاح من سر الشركة + PIN الموظف
-    const companySecret = "CompanySecureKey2024"; // يمكن تغيير هذا
-    const combinedSecret = companySecret + employee.encryption_pin;
-    
-    const encoder = new TextEncoder();
-    const keyMaterial = await crypto.subtle.importKey(
-      "raw",
-      encoder.encode(combinedSecret),
-      "PBKDF2",
-      false,
-      ["deriveKey"]
-    );
-    
-    companyMasterKey = await crypto.subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        salt: encoder.encode("CompanyFileSystem"),
-        iterations: 100000,
-        hash: "SHA-256"
-      },
-      keyMaterial,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"]
-    );
-    
-    return companyMasterKey;
-    
-  } catch (error) {
-    console.error("Error getting master key:", error);
-    throw new Error("تعذر الحصول على مفتاح التشفير");
-  }
-}
-
-// إعداد PIN للموظف الجديد
-async function setupEmployeePIN() {
-  const pin = prompt(`إعداد رمز التشفير (PIN)
-
-أدخل رمز PIN مكون من 4-6 أرقام:
-سيتم استخدام هذا الرمز لتشفير وفك تشفير جميع الملفات.
-
-ملاحظة: يجب أن تتذكر هذا الرمز لأنه غير مخزن بأي مكان آخر.`);
-  
-  if (!pin || pin.length < 4) {
-    throw new Error("يجب أن يكون PIN مكون من 4 أرقام على الأقل");
-  }
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  
-  // حفظ PIN في قاعدة البيانات
-  const { error } = await supabase
-    .from("employees")
-    .update({ 
-      encryption_pin: pin
-    })
-    .eq("id", user.id);
-  
-  if (error) {
-    throw new Error("فشل حفظ PIN: " + error.message);
-  }
-  
-  alert("تم حفظ PIN بنجاح!\n\nسيتم استخدامه لتشفير وفك تشفير الملفات.");
-}
-
-// --- نظام تشفير الملفات ---
-async function encryptFile(file) {
-  try {
-    // 1. إنشاء مفتاح فريد لهذا الملف
-    const fileKey = await crypto.subtle.generateKey(
+  if (!keyBase64) {
+    const newKey = await crypto.subtle.generateKey(
       { name: "AES-GCM", length: 256 },
       true,
       ["encrypt", "decrypt"]
     );
-    
-    // 2. تشفير الملف بالمفتاح الفريد
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const fileBuffer = await file.arrayBuffer();
-    const encrypted = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      fileKey,
-      fileBuffer
-    );
-    
-    // 3. الحصول على المفتاح الرئيسي للشركة
-    const masterKey = await getCompanyMasterKey();
-    
-    // 4. تشفير مفتاح الملف بالمفتاح الرئيسي
-    const keyIv = crypto.getRandomValues(new Uint8Array(12));
-    const exportedFileKey = await crypto.subtle.exportKey("raw", fileKey);
-    const encryptedFileKey = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv: keyIv },
-      masterKey,
-      exportedFileKey
-    );
-    
-    return {
-      encrypted,
-      iv,
-      encryptedFileKey: arrayBufferToBase64(encryptedFileKey),
-      keyIv: arrayBufferToBase64(keyIv)
-    };
-    
-  } catch (error) {
-    console.error("Error encrypting file:", error);
-    throw new Error("فشل تشفير الملف: " + error.message);
+
+    const rawKey = await crypto.subtle.exportKey("raw", newKey);
+    keyBase64 = arrayBufferToBase64(rawKey);
+    localStorage.setItem("user_aes_key", keyBase64);
   }
+
+  const rawKey = base64ToArrayBuffer(keyBase64);
+
+  return await crypto.subtle.importKey(
+    "raw",
+    rawKey,
+    "AES-GCM",
+    false,
+    ["encrypt", "decrypt"]
+  );
 }
 
-// فك تشفير الملف
-async function decryptFile(buffer, iv, encryptedFileKeyBase64, keyIvBase64) {
-  try {
-    // 1. الحصول على المفتاح الرئيسي للشركة
-    const masterKey = await getCompanyMasterKey();
-    
-    // 2. فك تشفير مفتاح الملف
-    const encryptedFileKey = base64ToArrayBuffer(encryptedFileKeyBase64);
-    const keyIv = base64ToArrayBuffer(keyIvBase64);
-    
-    const decryptedFileKeyBuffer = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: keyIv },
-      masterKey,
-      encryptedFileKey
-    );
-    
-    // 3. استيراد مفتاح الملف
-    const fileKey = await crypto.subtle.importKey(
-      "raw",
-      decryptedFileKeyBuffer,
-      "AES-GCM",
-      false,
-      ["decrypt"]
-    );
-    
-    // 4. فك تشفير الملف
-    const decrypted = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      fileKey,
-      buffer
-    );
-    
-    return new Blob([decrypted]);
-    
-  } catch (error) {
-    console.error("Error decrypting file:", error);
-    if (error.toString().includes("OperationError")) {
-      throw new Error("رمز PIN غير صحيح. تأكد من إدخال الرمز الصحيح.");
-    }
-    throw new Error("تعذر فتح الملف: " + error.message);
-  }
+// Encrypt file → returns encrypted ArrayBuffer + IV
+async function encryptFile(file) {
+  const key = await getUserKey();
+  const iv = crypto.getRandomValues(new Uint8Array(12)); // GCM required
+
+  const fileBuffer = await file.arrayBuffer();
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    fileBuffer
+  );
+
+  return { encrypted, iv };
 }
 
-// تنظيف المخبأ
-function clearKeyCache() {
-  companyMasterKey = null;
+// Decrypt ArrayBuffer → returns Blob
+async function decryptFile(buffer, iv) {
+  const key = await getUserKey();
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    buffer
+  );
+
+  return new Blob([decrypted]);
 }
 
-// --- إعداد Supabase ---
+// Supabase setup
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// عرض الرسائل
+// Messages
 function showMessage(text, type = "error") {
   const msgBox = document.getElementById("messageBox");
   msgBox.textContent = text;
@@ -214,10 +88,10 @@ function showMessage(text, type = "error") {
   }
 }
 
-// تنسيق التاريخ
+// Format date function
 function formatDate(dateString) {
   const date = new Date(dateString);
-  return date.toLocaleDateString('ar-SA', {
+  return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -226,7 +100,7 @@ function formatDate(dateString) {
   });
 }
 
-// تحميل قائمة الموظفين
+// Load employees list from employees table
 async function loadEmployees() {
   const employeesList = document.getElementById('employeesList');
   employeesList.innerHTML = '';
@@ -237,12 +111,12 @@ async function loadEmployees() {
 
   if (error) {
     console.error("Error loading employees:", error);
-    showMessage("خطأ في تحميل قائمة الموظفين: " + error.message);
+    showMessage("Error loading employees list: " + error.message);
     return;
   }
 
   if (!data || data.length === 0) {
-    employeesList.innerHTML = '<p>لم يتم العثور على موظفين</p>';
+    employeesList.innerHTML = '<p>No employees found</p>';
     return;
   }
 
@@ -259,7 +133,7 @@ async function loadEmployees() {
   });
 }
 
-// الحصول على الموظفين المختارين
+// Get selected employees
 function getSelectedEmployees() {
   const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
   const selectedEmployees = [];
@@ -273,7 +147,8 @@ function getSelectedEmployees() {
   return selectedEmployees;
 }
 
-// إرسال الملف
+
+// Send file
 async function encryptAndSendFile() {
   const fileInput = document.getElementById('fileInput');
   const selectAllCheckbox = document.getElementById('selectAllEmployees');
@@ -282,24 +157,17 @@ async function encryptAndSendFile() {
   const sendToAll = selectAllCheckbox.checked;
   const selectedEmployees = getSelectedEmployees();
 
-  if (!file) {
-    showMessage("الرجاء اختيار ملف");
-    return;
-  }
-  
-  if (!sendToAll && selectedEmployees.length === 0) {
-    showMessage("الرجاء اختيار موظف واحد على الأقل");
-    return;
-  }
+  if (!file) return showMessage("Please select a file");
+  if (!sendToAll && selectedEmployees.length === 0) return showMessage("Please select at least one employee");
 
   try {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
-      showMessage("الرجاء تسجيل الدخول مرة أخرى");
+      showMessage("Please login again");
       return;
     }
 
-    // الحصول على اسم المرسل
+    // الحصول على اسم المرسل (الموظف الحالي)
     const { data: currentEmployee, error: empError } = await supabase
       .from("employees")
       .select("name")
@@ -307,22 +175,22 @@ async function encryptAndSendFile() {
       .single();
 
     if (empError || !currentEmployee) {
-      showMessage("تعذر العثور على بيانات الموظف");
+      showMessage("Error: Cannot find employee data");
       return;
     }
 
     const senderName = currentEmployee.name;
     const fileName = `${Date.now()}_${file.name}`;
 
-    // تشفير الملف
-    const { encrypted, iv, encryptedFileKey, keyIv } = await encryptFile(file);
+    // Encrypt file BEFORE upload
+    const { encrypted, iv } = await encryptFile(file);
 
-    // دمج IV + البيانات المشفرة
+    // Combine IV + encrypted data
     const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
     combined.set(iv, 0);
     combined.set(new Uint8Array(encrypted), iv.byteLength);
 
-    // رفع الملف المشفر
+    // Upload encrypted file
     const saudi = new Date().toLocaleString('en-SA', {
       timeZone: 'Asia/Riyadh'
     });
@@ -333,11 +201,11 @@ async function encryptAndSendFile() {
 
     if (uploadError) {
       console.error("Upload error:", uploadError);
-      showMessage("خطأ في رفع الملف: " + uploadError.message);
+      showMessage("Upload error: " + uploadError.message);
       return;
     }
 
-    // الحصول على بيانات الموظفين
+    // Get all employees if "Send to All" is selected
     let employeeData = [];
     if (sendToAll) {
       const { data: allEmployees, error: empError } = await supabase
@@ -345,26 +213,27 @@ async function encryptAndSendFile() {
         .select("id, name");
       
       if (empError) {
-        showMessage("خطأ في جلب بيانات الموظفين: " + empError.message);
+        showMessage("Error fetching employees: " + empError.message);
         return;
       }
       
       employeeData = allEmployees;
     } else {
+      // الحصول على بيانات الموظفين المختارين (الأسماء والمعرفات)
       const { data: selectedEmployeesData, error: selError } = await supabase
         .from("employees")
         .select("id, name")
         .in("id", selectedEmployees);
       
       if (selError) {
-        showMessage("خطأ في جلب بيانات الموظفين المختارين: " + selError.message);
+        showMessage("Error fetching selected employees: " + selError.message);
         return;
       }
       
       employeeData = selectedEmployeesData;
     }
 
-    // حفظ البيانات في قاعدة البيانات
+    // Save data in shared_files for each employee
     const currentUser = user.id;
     const fileRecords = employeeData.map(employee => ({
       file_name: file.name,
@@ -372,29 +241,28 @@ async function encryptAndSendFile() {
       allowed_user_id: employee.id,
       uploaded_by: currentUser,
       created_at: saudi,
-      sender_name: senderName,
-      receiver_name: employee.name,
-      encrypted_file_key: encryptedFileKey,
-      key_iv: keyIv
+      sender_name: senderName,        // اسم المرسل
+      receiver_name: employee.name    // اسم المستقبل
     }));
 
+    // Insert records into shared_files table
     const { error: dbError } = await supabase
       .from("shared_files")
       .insert(fileRecords);
 
     if (dbError) {
       console.error("Database error:", dbError);
-      showMessage("خطأ في قاعدة البيانات: " + dbError.message);
+      showMessage("Database error: " + dbError.message);
       
-      // محاولة حذف الملف المرفوع إذا فشل الإدراج
+      // Try to delete the uploaded file if DB insertion fails
       await supabase.storage.from("files").remove([uploadData.path]);
       return;
     }
 
-    showMessage(`تم إرسال الملف بنجاح إلى ${employeeData.length} موظف!`, "success");
+    showMessage(`File sent successfully to ${employeeData.length} employee(s)!`, "success");
     fileInput.value = "";
     
-    // إعادة تعيين الخيارات
+    // Reset options
     selectAllCheckbox.checked = false;
     const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
     checkboxes.forEach(checkbox => {
@@ -402,34 +270,30 @@ async function encryptAndSendFile() {
       checkbox.disabled = false;
     });
 
-    // إعادة تحميل الملفات المستلمة
+    // Reload received files
     setTimeout(() => {
       loadReceivedFiles();
     }, 1000);
   } 
   catch (err) {
     console.error("Unexpected error:", err);
-    if (err.message.includes("PIN")) {
-      showMessage("خطأ في رمز التشفير: " + err.message);
-    } else {
-      showMessage("خطأ غير متوقع: " + err.message);
-    }
+    showMessage("Unexpected error: " + err.message);
   }
 }
 
-// تحميل الملفات المستلمة
+// Load received files
 async function loadReceivedFiles() {
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser();
     if (userError || !userData.user) {
       console.error("Auth error:", userError);
-      showMessage("الرجاء تسجيل الدخول مرة أخرى");
+      showMessage("Please login again");
       return;
     }
 
     const currentUser = userData.user;
 
-    // الحصول على الملفات
+    // Get files where current user is either recipient or sender
     const { data: files, error } = await supabase
       .from("shared_files")
       .select("*")
@@ -438,7 +302,7 @@ async function loadReceivedFiles() {
 
     if (error) {
       console.error("Error loading files:", error);
-      showMessage("خطأ في تحميل الملفات: " + error.message);
+      showMessage("Error loading files: " + error.message);
       return;
     }
 
@@ -446,17 +310,17 @@ async function loadReceivedFiles() {
     receivedList.innerHTML = "";
 
     if (!files || files.length === 0) {
-      receivedList.innerHTML = "<p>لا توجد ملفات مستلمة بعد.</p>";
+      receivedList.innerHTML = "<p>No files received yet.</p>";
       return;
     }
 
-    // فصل الملفات المستلمة عن الملفات المرسلة
+    // Separate received files from sent files
     const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
     const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
 
     if (receivedFiles.length > 0) {
       const receivedHeader = document.createElement("h3");
-      receivedHeader.textContent = "الملفات المستلمة";
+      receivedHeader.textContent = "Received Files";
       receivedHeader.style.marginTop = "20px";
       receivedHeader.style.color = "#333";
       receivedList.appendChild(receivedHeader);
@@ -467,9 +331,9 @@ async function loadReceivedFiles() {
         div.innerHTML = `
           <div>
             <strong>${file.file_name}</strong><br />
-            <small>من: ${file.sender_name} • استلم: ${formatDate(file.created_at)}</small>
+            <small>From: ${file.sender_name} • Received: ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}', '${file.encrypted_file_key}', '${file.key_iv}')">تحميل</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
@@ -477,7 +341,7 @@ async function loadReceivedFiles() {
 
     if (sentFiles.length > 0) {
       const sentHeader = document.createElement("h3");
-      sentHeader.textContent = "الملفات المرسلة";
+      sentHeader.textContent = "Sent Files";
       sentHeader.style.marginTop = "20px";
       sentHeader.style.color = "#333";
       receivedList.appendChild(sentHeader);
@@ -488,9 +352,9 @@ async function loadReceivedFiles() {
         div.innerHTML = `
           <div>
             <strong>${file.file_name}</strong><br />
-            <small>إلى: ${file.receiver_name} • ${formatDate(file.created_at)}</small>
+            <small>Sent to: ${file.receiver_name} • ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}', '${file.encrypted_file_key}', '${file.key_iv}')">تحميل</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
@@ -498,28 +362,28 @@ async function loadReceivedFiles() {
 
   } catch (err) {
     console.error("Unexpected error in loadReceivedFiles:", err);
-    showMessage("خطأ في تحميل الملفات");
+    showMessage("Error loading files");
   }
 }
 
-// تحميل الملف
-async function downloadFile(path, fileName, encryptedFileKey, keyIv) {
+// Download file
+async function downloadFile(path, fileName) {
   try {
     const { data, error } = await supabase.storage.from("files").download(path);
-    if (error) return showMessage("خطأ في تحميل الملف: " + error.message);
+    if (error) return showMessage("Error downloading file: " + error.message);
 
     const arrayBuffer = await data.arrayBuffer();
 
-    // استخراج IV (أول 12 بايت)
+    // Extract IV (first 12 bytes)
     const iv = arrayBuffer.slice(0, 12);
 
-    // استخراج المحتوى المشفر
+    // Extract encrypted content
     const encrypted = arrayBuffer.slice(12);
 
-    // فك التشفير
-    const blob = await decryptFile(encrypted, iv, encryptedFileKey, keyIv);
+    // Decrypt
+    const blob = await decryptFile(encrypted, iv);
 
-    // تحميل الملف
+    // Download
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -529,54 +393,34 @@ async function downloadFile(path, fileName, encryptedFileKey, keyIv) {
     URL.revokeObjectURL(url);
 
   } catch (err) {
-    if (err.message.includes("رمز PIN") || err.message.includes("PIN")) {
-      showMessage("تعذر فتح الملف: " + err.message);
-    } else {
-      showMessage("خطأ في تحميل الملف: " + err.message);
-    }
+    showMessage("Decrypt error: " + err.message);
   }
 }
 
-// تسجيل الخروج
+// Logout
 async function logout() {
-  clearKeyCache();
   await supabase.auth.signOut();
   window.location.href = "index.html";
 }
 
-// عند تحميل الصفحة
+// On page load
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    // تنظيف أي مخبأ قديم
-    clearKeyCache();
-    
-    // التحقق من تسجيل الدخول
+    // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       window.location.href = "index.html";
       return;
     }
 
-    // التحقق مما إذا كان الموظف لديه PIN
-    const { data: employee } = await supabase
-      .from("employees")
-      .select("encryption_pin")
-      .eq("id", user.id)
-      .single();
-
-    if (!employee || !employee.encryption_pin) {
-      // إذا لم يكن لديه PIN، نطلبه الآن
-      await setupEmployeePIN();
-    }
-
     await loadEmployees();
     await loadReceivedFiles();
 
-    // إضافة المستمعين للأحداث
+    // Add event listeners
     document.getElementById("encryptBtn").addEventListener("click", encryptAndSendFile);
     document.getElementById("logoutBtn").addEventListener("click", logout);
     
-    // حدث "إرسال لجميع الموظفين"
+    // Add event for "Send to All Employees" option
     document.getElementById("selectAllEmployees").addEventListener("change", function() {
       const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
       checkboxes.forEach(checkbox => {
@@ -585,15 +429,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
-    // تنظيف المخبأ عند إغلاق الصفحة
-    window.addEventListener("beforeunload", clearKeyCache);
-
   } catch (error) {
     console.error("Initialization error:", error);
-    showMessage("خطأ في تهيئة لوحة التحكم: " + error.message);
+    showMessage("Error initializing dashboard");
   }
 });
 
-// جعل الدوال متاحة عالمياً
+// Make functions available globally
 window.downloadFile = downloadFile;
-window.clearKeyCache = clearKeyCache;
+
