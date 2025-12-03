@@ -30,7 +30,7 @@ async function getCompanyMasterKey() {
   masterKeyPromise = (async () => {
     try {
       // 1. طلب كلمة مرور الشركة من المستخدم
-      const companyPassword = prompt("أدخل كلمة مرور الشركة (Company Password):\n\nتستخدم هذه الكلمة لتشفير وفك تشفير جميع الملفات في النظام.");
+      const companyPassword = prompt("Enter the company password:\n\nThis password is used to encrypt and decrypt all files in the system.");
       
       if (!companyPassword) {
         throw new Error("كلمة مرور الشركة مطلوبة");
@@ -63,7 +63,7 @@ async function getCompanyMasterKey() {
       
     } catch (error) {
       console.error("Error getting company master key:", error);
-      throw new Error("تعذر الحصول على مفتاح التشفير: " + error.message);
+      throw new Error("The encryption key could not be obtained: " + error.message);
     }
   })();
   
