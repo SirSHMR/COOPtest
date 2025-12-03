@@ -1,4 +1,4 @@
-// --- AES Encryption Helpers (User-Specific Key) ---
+// --- AES Encryption Helpers (Company Master Key) ---
 
 // Convert ArrayBuffer ↔ Base64
 function arrayBufferToBase64(buffer) {
@@ -15,59 +15,155 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
-// Generate and store user-specific AES key
-async function getUserKey() {
-  let keyBase64 = localStorage.getItem("user_aes_key");
+// --- نظام المفتاح الرئيسي للشركة ---
+let companyMasterKey = null;
+let masterKeyPromise = null;
 
-  if (!keyBase64) {
-    const newKey = await crypto.subtle.generateKey(
-      { name: "AES-GCM", length: 256 },
-      true,
-      ["encrypt", "decrypt"]
-    );
+// اشتقاق مفتاح من كلمة مرور الشركة
+async function getCompanyMasterKey() {
+  // إذا كان المفتاح محفوظاً في الذاكرة
+  if (companyMasterKey) return companyMasterKey;
+  
+  // منع طلبات متعددة في نفس الوقت
+  if (masterKeyPromise) return masterKeyPromise;
+  
+  masterKeyPromise = (async () => {
+    try {
+      // 1. طلب كلمة مرور الشركة من المستخدم
+      const companyPassword = prompt("أدخل كلمة مرور الشركة (Company Password):\n\nتستخدم هذه الكلمة لتشفير وفك تشفير جميع الملفات في النظام.");
+      
+      if (!companyPassword) {
+        throw new Error("كلمة مرور الشركة مطلوبة");
+      }
+      
+      // 2. اشتقاق مفتاح التشفير من كلمة مرور الشركة
+      const encoder = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        encoder.encode(companyPassword),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+      
+      companyMasterKey = await crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: encoder.encode("CompanyFileSystemSalt"), // Salt ثابت للشركة
+          iterations: 100000,
+          hash: "SHA-256"
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+      
+      return companyMasterKey;
+      
+    } catch (error) {
+      console.error("Error getting company master key:", error);
+      throw new Error("تعذر الحصول على مفتاح التشفير: " + error.message);
+    }
+  })();
+  
+  return masterKeyPromise;
+}
 
-    const rawKey = await crypto.subtle.exportKey("raw", newKey);
-    keyBase64 = arrayBufferToBase64(rawKey);
-    localStorage.setItem("user_aes_key", keyBase64);
-  }
-
-  const rawKey = base64ToArrayBuffer(keyBase64);
-
-  return await crypto.subtle.importKey(
-    "raw",
-    rawKey,
-    "AES-GCM",
-    false,
+// Generate per-file unique encryption key
+async function generateFileKey() {
+  return await crypto.subtle.generateKey(
+    { name: "AES-GCM", length: 256 },
+    true,
     ["encrypt", "decrypt"]
   );
 }
 
-// Encrypt file → returns encrypted ArrayBuffer + IV
+// Encrypt file → returns encrypted ArrayBuffer + IV + encrypted file key
 async function encryptFile(file) {
-  const key = await getUserKey();
-  const iv = crypto.getRandomValues(new Uint8Array(12)); // GCM required
-
-  const fileBuffer = await file.arrayBuffer();
-  const encrypted = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
-    key,
-    fileBuffer
-  );
-
-  return { encrypted, iv };
+  try {
+    // 1. Generate unique key for this file
+    const fileKey = await generateFileKey();
+    
+    // 2. Encrypt file with the unique key
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const fileBuffer = await file.arrayBuffer();
+    const encrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      fileKey,
+      fileBuffer
+    );
+    
+    // 3. Get company master key to encrypt the file key
+    const masterKey = await getCompanyMasterKey();
+    
+    // 4. Encrypt the file key with company master key
+    const keyIv = crypto.getRandomValues(new Uint8Array(12));
+    const exportedFileKey = await crypto.subtle.exportKey("raw", fileKey);
+    const encryptedFileKey = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: keyIv },
+      masterKey,
+      exportedFileKey
+    );
+    
+    return {
+      encrypted,
+      iv,
+      encryptedFileKey: arrayBufferToBase64(encryptedFileKey),
+      keyIv: arrayBufferToBase64(keyIv)
+    };
+  } catch (error) {
+    console.error("Error encrypting file:", error);
+    throw new Error("Failed to encrypt file: " + error.message);
+  }
 }
 
-// Decrypt ArrayBuffer → returns Blob
-async function decryptFile(buffer, iv) {
-  const key = await getUserKey();
+// Decrypt file key then file
+async function decryptFile(buffer, iv, encryptedFileKeyBase64, keyIvBase64) {
+  try {
+    // 1. Get company master key
+    const masterKey = await getCompanyMasterKey();
+    
+    // 2. Decrypt the file key
+    const encryptedFileKey = base64ToArrayBuffer(encryptedFileKeyBase64);
+    const keyIv = base64ToArrayBuffer(keyIvBase64);
+    
+    const decryptedFileKeyBuffer = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: keyIv },
+      masterKey,
+      encryptedFileKey
+    );
+    
+    // 3. Import the decrypted file key
+    const fileKey = await crypto.subtle.importKey(
+      "raw",
+      decryptedFileKeyBuffer,
+      "AES-GCM",
+      false,
+      ["decrypt"]
+    );
+    
+    // 4. Decrypt the file content
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      fileKey,
+      buffer
+    );
+    
+    return new Blob([decrypted]);
+  } catch (error) {
+    console.error("Error decrypting file:", error);
+    if (error.name === "OperationError") {
+      throw new Error("Company password is incorrect or file is corrupted");
+    }
+    throw error;
+  }
+}
 
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
-    key,
-    buffer
-  );
-
-  return new Blob([decrypted]);
+// Clear key cache on logout
+function clearKeyCache() {
+  companyMasterKey = null;
+  masterKeyPromise = null;
 }
 
 // Supabase setup
@@ -182,8 +278,8 @@ async function encryptAndSendFile() {
     const senderName = currentEmployee.name;
     const fileName = `${Date.now()}_${file.name}`;
 
-    // Encrypt file BEFORE upload
-    const { encrypted, iv } = await encryptFile(file);
+    // Encrypt file WITH NEW PER-FILE KEY SYSTEM
+    const { encrypted, iv, encryptedFileKey, keyIv } = await encryptFile(file);
 
     // Combine IV + encrypted data
     const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
@@ -233,7 +329,7 @@ async function encryptAndSendFile() {
       employeeData = selectedEmployeesData;
     }
 
-    // Save data in shared_files for each employee
+    // Save data in shared_files for each employee WITH ENCRYPTED KEY INFO
     const currentUser = user.id;
     const fileRecords = employeeData.map(employee => ({
       file_name: file.name,
@@ -241,8 +337,10 @@ async function encryptAndSendFile() {
       allowed_user_id: employee.id,
       uploaded_by: currentUser,
       created_at: saudi,
-      sender_name: senderName,        // اسم المرسل
-      receiver_name: employee.name    // اسم المستقبل
+      sender_name: senderName,
+      receiver_name: employee.name,
+      encrypted_file_key: encryptedFileKey, // Store encrypted file key
+      key_iv: keyIv // Store IV for file key decryption
     }));
 
     // Insert records into shared_files table
@@ -277,7 +375,12 @@ async function encryptAndSendFile() {
   } 
   catch (err) {
     console.error("Unexpected error:", err);
-    showMessage("Unexpected error: " + err.message);
+    if (err.message.includes("Company password") || err.message.includes("كلمة مرور الشركة")) {
+      showMessage("Company password is incorrect. Please try again.");
+      clearKeyCache(); // Clear wrong key from cache
+    } else {
+      showMessage("Unexpected error: " + err.message);
+    }
   }
 }
 
@@ -333,7 +436,7 @@ async function loadReceivedFiles() {
             <strong>${file.file_name}</strong><br />
             <small>From: ${file.sender_name} • Received: ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}', '${file.encrypted_file_key}', '${file.key_iv}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
@@ -354,7 +457,7 @@ async function loadReceivedFiles() {
             <strong>${file.file_name}</strong><br />
             <small>Sent to: ${file.receiver_name} • ${formatDate(file.created_at)}</small>
           </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
+          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}', '${file.encrypted_file_key}', '${file.key_iv}')">Download</button>
         `;
         receivedList.appendChild(div);
       });
@@ -367,7 +470,7 @@ async function loadReceivedFiles() {
 }
 
 // Download file
-async function downloadFile(path, fileName) {
+async function downloadFile(path, fileName, encryptedFileKey, keyIv) {
   try {
     const { data, error } = await supabase.storage.from("files").download(path);
     if (error) return showMessage("Error downloading file: " + error.message);
@@ -380,8 +483,8 @@ async function downloadFile(path, fileName) {
     // Extract encrypted content
     const encrypted = arrayBuffer.slice(12);
 
-    // Decrypt
-    const blob = await decryptFile(encrypted, iv);
+    // Decrypt WITH ENCRYPTED FILE KEY SYSTEM
+    const blob = await decryptFile(encrypted, iv, encryptedFileKey, keyIv);
 
     // Download
     const url = URL.createObjectURL(blob);
@@ -393,12 +496,18 @@ async function downloadFile(path, fileName) {
     URL.revokeObjectURL(url);
 
   } catch (err) {
-    showMessage("Decrypt error: " + err.message);
+    if (err.message.includes("Company password") || err.message.includes("كلمة مرور الشركة")) {
+      showMessage("Company password is incorrect. The key will be cleared from memory, please try again.");
+      clearKeyCache(); // Clear wrong key from cache
+    } else {
+      showMessage("Decrypt error: " + err.message);
+    }
   }
 }
 
 // Logout
 async function logout() {
+  clearKeyCache(); // Clear encryption key from memory
   await supabase.auth.signOut();
   window.location.href = "index.html";
 }
@@ -406,6 +515,9 @@ async function logout() {
 // On page load
 document.addEventListener("DOMContentLoaded", async () => {
   try {
+    // Clear any existing key cache
+    clearKeyCache();
+    
     // Check if user is authenticated
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -429,6 +541,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     });
 
+    // Clear key cache when page is closed or refreshed
+    window.addEventListener("beforeunload", clearKeyCache);
+
   } catch (error) {
     console.error("Initialization error:", error);
     showMessage("Error initializing dashboard");
@@ -437,4 +552,4 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Make functions available globally
 window.downloadFile = downloadFile;
-
+window.clearKeyCache = clearKeyCache;
