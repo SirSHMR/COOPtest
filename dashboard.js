@@ -1,6 +1,6 @@
-// =============== dashboard.js مع نظام تشفير متكامل وآمن ===============
+// =============== نظام التشفير بالمفتاح المشترك + PIN ===============
 
-// --- دوال مساعدة للتشفير ---
+// تحويل ArrayBuffer ↔ Base64
 function arrayBufferToBase64(buffer) {
   let binary = "";
   const bytes = new Uint8Array(buffer);
@@ -15,7 +15,96 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
-// --- النظام الأساسي: كل ملف له مفتاح فريد ---
+// --- المفتاح الرئيسي للشركة (مشتق من سر الشركة + PIN المستخدم) ---
+let companyMasterKey = null;
+
+async function getCompanyMasterKey() {
+  if (companyMasterKey) return companyMasterKey;
+  
+  try {
+    // 1. الحصول على بيانات المستخدم الحالي
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("يجب تسجيل الدخول");
+    
+    // 2. الحصول على PIN الخاص بالموظف
+    const { data: employee } = await supabase
+      .from("employees")
+      .select("encryption_pin")
+      .eq("id", user.id)
+      .single();
+    
+    if (!employee || !employee.encryption_pin) {
+      // إذا لم يكن للموظف PIN، اطلب منه إنشاء واحد
+      await setupEmployeePIN();
+      return getCompanyMasterKey(); // إعادة المحاولة
+    }
+    
+    // 3. اشتقاق المفتاح من سر الشركة + PIN الموظف
+    const companySecret = "CompanySecureKey2024"; // يمكن تغيير هذا
+    const combinedSecret = companySecret + employee.encryption_pin;
+    
+    const encoder = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(combinedSecret),
+      "PBKDF2",
+      false,
+      ["deriveKey"]
+    );
+    
+    companyMasterKey = await crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: encoder.encode("CompanyFileSystem"),
+        iterations: 100000,
+        hash: "SHA-256"
+      },
+      keyMaterial,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+    
+    return companyMasterKey;
+    
+  } catch (error) {
+    console.error("Error getting master key:", error);
+    throw new Error("تعذر الحصول على مفتاح التشفير");
+  }
+}
+
+// إعداد PIN للموظف الجديد
+async function setupEmployeePIN() {
+  const pin = prompt(`إعداد رمز التشفير (PIN)
+
+أدخل رمز PIN مكون من 4-6 أرقام:
+سيتم استخدام هذا الرمز لتشفير وفك تشفير جميع الملفات.
+
+ملاحظة: يجب أن تتذكر هذا الرمز لأنه غير مخزن بأي مكان آخر.`);
+  
+  if (!pin || pin.length < 4) {
+    throw new Error("يجب أن يكون PIN مكون من 4 أرقام على الأقل");
+  }
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+  
+  // حفظ PIN في قاعدة البيانات
+  const { error } = await supabase
+    .from("employees")
+    .update({ 
+      encryption_pin: pin
+    })
+    .eq("id", user.id);
+  
+  if (error) {
+    throw new Error("فشل حفظ PIN: " + error.message);
+  }
+  
+  alert("تم حفظ PIN بنجاح!\n\nسيتم استخدامه لتشفير وفك تشفير الملفات.");
+}
+
+// --- نظام تشفير الملفات ---
 async function encryptFile(file) {
   try {
     // 1. إنشاء مفتاح فريد لهذا الملف
@@ -34,12 +123,12 @@ async function encryptFile(file) {
       fileBuffer
     );
     
-    // 3. الحصول على المفتاح الرئيسي (المشتق من كلمة مرور المستخدم)
-    const masterKey = await getMasterKey();
+    // 3. الحصول على المفتاح الرئيسي للشركة
+    const masterKey = await getCompanyMasterKey();
     
-    // 4. تصدير مفتاح الملف وتشفيره بالمفتاح الرئيسي
-    const exportedFileKey = await crypto.subtle.exportKey("raw", fileKey);
+    // 4. تشفير مفتاح الملف بالمفتاح الرئيسي
     const keyIv = crypto.getRandomValues(new Uint8Array(12));
+    const exportedFileKey = await crypto.subtle.exportKey("raw", fileKey);
     const encryptedFileKey = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv: keyIv },
       masterKey,
@@ -52,61 +141,18 @@ async function encryptFile(file) {
       encryptedFileKey: arrayBufferToBase64(encryptedFileKey),
       keyIv: arrayBufferToBase64(keyIv)
     };
+    
   } catch (error) {
     console.error("Error encrypting file:", error);
-    throw new Error("فشل تشفير الملف");
-  }
-}
-
-// --- الحل الذكي: مشتق المفتاح الرئيسي من بيانات المستخدم ---
-let masterKeyCache = null;
-
-async function getMasterKey() {
-  if (masterKeyCache) return masterKeyCache;
-  
-  try {
-    // 1. الحصول على بيانات المستخدم الحالي
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) throw new Error("يجب تسجيل الدخول");
-    
-    // 2. استخدام معرف المستخدم + تاريخ إنشاء الحساب كمصدر للمفتاح
-    const userData = `${user.id}_${user.created_at}`;
-    const encoder = new TextEncoder();
-    
-    // 3. استخدام PBKDF2 لاشتقاق مفتاح آمن
-    const keyMaterial = await crypto.subtle.importKey(
-      "raw",
-      encoder.encode(userData),
-      "PBKDF2",
-      false,
-      ["deriveKey"]
-    );
-    
-    masterKeyCache = await crypto.subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        salt: encoder.encode("SecureFileSystem"), // يمكن تغيير هذا
-        iterations: 100000,
-        hash: "SHA-256"
-      },
-      keyMaterial,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"]
-    );
-    
-    return masterKeyCache;
-  } catch (error) {
-    console.error("Error deriving master key:", error);
-    throw new Error("تعذر توليد مفتاح التشفير");
+    throw new Error("فشل تشفير الملف: " + error.message);
   }
 }
 
 // فك تشفير الملف
 async function decryptFile(buffer, iv, encryptedFileKeyBase64, keyIvBase64) {
   try {
-    // 1. الحصول على المفتاح الرئيسي
-    const masterKey = await getMasterKey();
+    // 1. الحصول على المفتاح الرئيسي للشركة
+    const masterKey = await getCompanyMasterKey();
     
     // 2. فك تشفير مفتاح الملف
     const encryptedFileKey = base64ToArrayBuffer(encryptedFileKeyBase64);
@@ -135,24 +181,28 @@ async function decryptFile(buffer, iv, encryptedFileKeyBase64, keyIvBase64) {
     );
     
     return new Blob([decrypted]);
+    
   } catch (error) {
     console.error("Error decrypting file:", error);
-    throw new Error("تعذر فتح الملف. تأكد من أنك تستخدم حسابك الصحيح.");
+    if (error.toString().includes("OperationError")) {
+      throw new Error("رمز PIN غير صحيح. تأكد من إدخال الرمز الصحيح.");
+    }
+    throw new Error("تعذر فتح الملف: " + error.message);
   }
 }
 
-// تنظيف المخبأ عند تسجيل الخروج
+// تنظيف المخبأ
 function clearKeyCache() {
-  masterKeyCache = null;
+  companyMasterKey = null;
 }
 
-// --- بقية الكود بدون تغيير ---
+// --- إعداد Supabase ---
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Messages
+// عرض الرسائل
 function showMessage(text, type = "error") {
   const msgBox = document.getElementById("messageBox");
   msgBox.textContent = text;
@@ -164,10 +214,10 @@ function showMessage(text, type = "error") {
   }
 }
 
-// Format date function
+// تنسيق التاريخ
 function formatDate(dateString) {
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
+  return date.toLocaleDateString('ar-SA', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -176,7 +226,7 @@ function formatDate(dateString) {
   });
 }
 
-// Load employees list from employees table
+// تحميل قائمة الموظفين
 async function loadEmployees() {
   const employeesList = document.getElementById('employeesList');
   employeesList.innerHTML = '';
@@ -187,12 +237,12 @@ async function loadEmployees() {
 
   if (error) {
     console.error("Error loading employees:", error);
-    showMessage("Error loading employees list: " + error.message);
+    showMessage("خطأ في تحميل قائمة الموظفين: " + error.message);
     return;
   }
 
   if (!data || data.length === 0) {
-    employeesList.innerHTML = '<p>No employees found</p>';
+    employeesList.innerHTML = '<p>لم يتم العثور على موظفين</p>';
     return;
   }
 
@@ -209,7 +259,7 @@ async function loadEmployees() {
   });
 }
 
-// Get selected employees
+// الحصول على الموظفين المختارين
 function getSelectedEmployees() {
   const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
   const selectedEmployees = [];
@@ -223,7 +273,7 @@ function getSelectedEmployees() {
   return selectedEmployees;
 }
 
-// إرسال الملف مع التشفير التلقائي
+// إرسال الملف
 async function encryptAndSendFile() {
   const fileInput = document.getElementById('fileInput');
   const selectAllCheckbox = document.getElementById('selectAllEmployees');
@@ -359,7 +409,11 @@ async function encryptAndSendFile() {
   } 
   catch (err) {
     console.error("Unexpected error:", err);
-    showMessage("خطأ غير متوقع: " + err.message);
+    if (err.message.includes("PIN")) {
+      showMessage("خطأ في رمز التشفير: " + err.message);
+    } else {
+      showMessage("خطأ غير متوقع: " + err.message);
+    }
   }
 }
 
@@ -475,15 +529,15 @@ async function downloadFile(path, fileName, encryptedFileKey, keyIv) {
     URL.revokeObjectURL(url);
 
   } catch (err) {
-    if (err.message.includes("المفتاح")) {
-      showMessage("تعذر فتح الملف. قد يكون تم إنشاؤه بحساب مختلف.");
+    if (err.message.includes("رمز PIN") || err.message.includes("PIN")) {
+      showMessage("تعذر فتح الملف: " + err.message);
     } else {
       showMessage("خطأ في تحميل الملف: " + err.message);
     }
   }
 }
 
-// تسجيل الخروج مع تنظيف المخبأ
+// تسجيل الخروج
 async function logout() {
   clearKeyCache();
   await supabase.auth.signOut();
@@ -501,6 +555,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!user) {
       window.location.href = "index.html";
       return;
+    }
+
+    // التحقق مما إذا كان الموظف لديه PIN
+    const { data: employee } = await supabase
+      .from("employees")
+      .select("encryption_pin")
+      .eq("id", user.id)
+      .single();
+
+    if (!employee || !employee.encryption_pin) {
+      // إذا لم يكن لديه PIN، نطلبه الآن
+      await setupEmployeePIN();
     }
 
     await loadEmployees();
@@ -524,7 +590,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   } catch (error) {
     console.error("Initialization error:", error);
-    showMessage("خطأ في تهيئة لوحة التحكم");
+    showMessage("خطأ في تهيئة لوحة التحكم: " + error.message);
   }
 });
 
