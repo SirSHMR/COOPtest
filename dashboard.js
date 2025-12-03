@@ -1,216 +1,152 @@
-// --- Simple Encryption Manager (معدل) ---
+// =====================================================
+// Permanent User Encryption Manager
+// =====================================================
 
-class SimpleEncryptionManager {
+class PermanentEncryptionManager {
   constructor() {
     this.userKey = null;
     this.currentUserId = null;
   }
   
-  // الحصول على مفتاح المستخدم (يتم مرة واحدة عند تسجيل الدخول)
-  async initializeUserEncryption() {
+  // استخراج مفتاح دائم من بيانات المستخدم
+  async getPermanentUserKey() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       
       this.currentUserId = user.id;
       
-      // 1. تحقق من وجود مفتاح في sessionStorage
-      const storedKey = sessionStorage.getItem(`user_key_${user.id}`);
+      // 1. استخدام مزيج من user.id و user.email لإنشاء مفتاح دائم
+      const keyData = await this.derivePermanentKey(user.id, user.email);
       
-      if (storedKey) {
-        // 2. تحميل المفتاح الموجود
-        const rawKey = base64ToArrayBuffer(storedKey);
-        this.userKey = await crypto.subtle.importKey(
-          "raw",
-          rawKey,
-          "AES-GCM",
-          false, // ليس extractable
-          ["encrypt", "decrypt"]
-        );
-        return this.userKey;
-      }
-      
-      // 3. إنشاء مفتاح عشوائي جديد (ليس مشتقاً من كلمة مرور)
-      this.userKey = await crypto.subtle.generateKey(
-        {
-          name: "AES-GCM",
-          length: 256
-        },
-        true, // قابل للتصدير
+      // 2. استيراده كمفتاح AES
+      this.userKey = await crypto.subtle.importKey(
+        "raw",
+        keyData,
+        { name: "AES-GCM" },
+        false, // ليس extractable
         ["encrypt", "decrypt"]
       );
-      
-      // 4. تخزين المفتاح في sessionStorage
-      const rawKey = await crypto.subtle.exportKey("raw", this.userKey);
-      sessionStorage.setItem(`user_key_${user.id}`, arrayBufferToBase64(rawKey));
       
       return this.userKey;
       
     } catch (error) {
-      console.error("Error initializing encryption:", error);
-      return null;
+      console.error("Error getting permanent key:", error);
+      throw new Error("Cannot initialize encryption system");
     }
   }
   
-  // بديل: إنشاء مفتاح مشتق من بيانات المستخدم (ولكن قابل للتصدير)
-  async initializeUserEncryptionV2() {
+  // اشتقاق مفتاح دائم من معرف المستخدم والبريد
+  async derivePermanentKey(userId, userEmail) {
+    const encoder = new TextEncoder();
+    
+    // 1. إنشاء مادة أولية للمفتاح
+    const baseData = encoder.encode(userId + "|" + userEmail + "|" + "company_secret_salt");
+    
+    // 2. استخدام HKDF لاشتقاق مفتاح آمن
+    // أولاً: استيراد المادة الأولية كمفتاح HMAC
+    const hmacKey = await crypto.subtle.importKey(
+      "raw",
+      baseData,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    
+    // 3. اشتقاق المفتاح باستخدام HKDF
+    const info = encoder.encode("AES-256-GCM-Encryption-Key");
+    const salt = encoder.encode("company_encryption_system");
+    
+    // نقوم بـ HKDF يدوياً باستخدام HMAC
+    // HKDF-Extract
+    const prk = await crypto.subtle.sign(
+      "HMAC",
+      hmacKey,
+      salt
+    );
+    
+    // HKDF-Expand
+    const prkKey = await crypto.subtle.importKey(
+      "raw",
+      prk,
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    
+    let t = new Uint8Array(0);
+    const okm = new Uint8Array(32); // 256-bit for AES-256
+    let offset = 0;
+    
+    for (let i = 1; offset < 32; i++) {
+      const input = new Uint8Array(t.length + info.length + 1);
+      input.set(t);
+      input.set(info, t.length);
+      input.set([i], t.length + info.length);
+      
+      const chunk = await crypto.subtle.sign(
+        "HMAC",
+        prkKey,
+        input
+      );
+      
+      const chunkArray = new Uint8Array(chunk);
+      const toCopy = Math.min(32 - offset, chunkArray.length);
+      okm.set(chunkArray.slice(0, toCopy), offset);
+      offset += toCopy;
+      t = chunkArray.slice(0, toCopy);
+    }
+    
+    return okm.buffer;
+  }
+  
+  // بديل أبسط (لكن أقل أماناً)
+  async getSimplePermanentKey() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       
       this.currentUserId = user.id;
       
-      // 1. تحقق من وجود مفتاح في sessionStorage
-      const storedKey = sessionStorage.getItem(`user_key_${user.id}`);
-      
-      if (storedKey) {
-        const rawKey = base64ToArrayBuffer(storedKey);
-        this.userKey = await crypto.subtle.importKey(
-          "raw",
-          rawKey,
-          "AES-GCM",
-          false,
-          ["encrypt", "decrypt"]
-        );
-        return this.userKey;
-      }
-      
-      // 2. إنشاء مفتاح باستخدام HMAC مع salt فريد
+      // استخدام PBKDF2 لاشتقاق مفتاح دائم
       const encoder = new TextEncoder();
-      const userIdData = encoder.encode(user.id);
+      const password = encoder.encode(user.id + ":" + user.email);
       
-      // استخدام PBKDF2 لإنشاء مادة مفتاحية
+      // استيراد كلمة المرور
       const keyMaterial = await crypto.subtle.importKey(
         "raw",
-        userIdData,
+        password,
         "PBKDF2",
         false,
         ["deriveBits"]
       );
       
-      // اشتقاق bits
+      // اشتقاق 256 بت (32 بايت) باستخدام PBKDF2
       const derivedBits = await crypto.subtle.deriveBits(
         {
           name: "PBKDF2",
-          salt: encoder.encode(user.email).slice(0, 16),
-          iterations: 10000,
+          salt: encoder.encode("encryption_salt"), // يمكن تغيير هذا لأمان أفضل
+          iterations: 100000,
           hash: "SHA-256"
         },
         keyMaterial,
         256
       );
       
-      // استيراد الـ bits كمفتاح AES
+      // تحويل إلى مفتاح AES
       this.userKey = await crypto.subtle.importKey(
         "raw",
         derivedBits,
-        "AES-GCM",
-        false, // ليس extractable
+        { name: "AES-GCM" },
+        false,
         ["encrypt", "decrypt"]
       );
-      
-      // 3. تخزين البيانات المستخدمة لإعادة إنشاء المفتاح (وليس المفتاح نفسه)
-      const keyInfo = {
-        userId: user.id,
-        userEmail: user.email,
-        algorithm: "PBKDF2-AES-GCM"
-      };
-      sessionStorage.setItem(`user_key_info_${user.id}`, JSON.stringify(keyInfo));
       
       return this.userKey;
       
     } catch (error) {
-      console.error("Error initializing encryption V2:", error);
-      // الرجوع إلى الطريقة البسيطة
-      return this.initializeUserEncryption();
-    }
-  }
-  
-  // الطريقة البسيطة الموصى بها
-  async initializeSimpleEncryption() {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      
-      this.currentUserId = user.id;
-      
-      // مفتاح تخزين مؤقت
-      const storageKey = `user_key_${user.id}`;
-      
-      // حاول تحميل المفتاح من الذاكرة المؤقتة
-      if (this.userKey) {
-        return this.userKey;
-      }
-      
-      // تحقق من sessionStorage
-      const storedKey = sessionStorage.getItem(storageKey);
-      if (storedKey) {
-        const rawKey = base64ToArrayBuffer(storedKey);
-        this.userKey = await crypto.subtle.importKey(
-          "raw",
-          rawKey,
-          "AES-GCM",
-          false,
-          ["encrypt", "decrypt"]
-        );
-        return this.userKey;
-      }
-      
-      // إنشاء مفتاح جديد عشوائي
-      this.userKey = await crypto.subtle.generateKey(
-        {
-          name: "AES-GCM",
-          length: 256
-        },
-        true, // قابل للتصدير للتخزين
-        ["encrypt", "decrypt"]
-      );
-      
-      // تخزين المفتاح في sessionStorage
-      const rawKey = await crypto.subtle.exportKey("raw", this.userKey);
-      sessionStorage.setItem(storageKey, arrayBufferToBase64(rawKey));
-      
-      return this.userKey;
-      
-    } catch (error) {
-      console.error("Error in simple encryption:", error);
-      
-      // خطة بديلة: استخدام مفتاح مشتق من user_id مباشرة
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return null;
-        
-        // إنشاء مفتاح من user_id مباشرة (أقل أماناً ولكن يعمل)
-        const encoder = new TextEncoder();
-        const userIdData = encoder.encode(user.id + user.email);
-        
-        // تأكد من أن البيانات 256 بت (32 بايت)
-        let keyData;
-        if (userIdData.length < 32) {
-          // إذا كانت قصيرة، كررها
-          const repeated = new Uint8Array(32);
-          for (let i = 0; i < 32; i++) {
-            repeated[i] = userIdData[i % userIdData.length];
-          }
-          keyData = repeated;
-        } else {
-          keyData = userIdData.slice(0, 32);
-        }
-        
-        this.userKey = await crypto.subtle.importKey(
-          "raw",
-          keyData,
-          "AES-GCM",
-          false,
-          ["encrypt", "decrypt"]
-        );
-        
-        return this.userKey;
-        
-      } catch (fallbackError) {
-        console.error("Fallback also failed:", fallbackError);
-        return null;
-      }
+      console.error("Error in simple permanent key:", error);
+      throw error;
     }
   }
   
@@ -218,7 +154,7 @@ class SimpleEncryptionManager {
   async encryptFile(file) {
     try {
       if (!this.userKey) {
-        await this.initializeSimpleEncryption();
+        await this.getSimplePermanentKey();
       }
       
       const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -234,7 +170,7 @@ class SimpleEncryptionManager {
       
     } catch (error) {
       console.error("Error encrypting file:", error);
-      throw error;
+      throw new Error("Failed to encrypt file");
     }
   }
   
@@ -242,7 +178,7 @@ class SimpleEncryptionManager {
   async decryptFile(buffer, iv) {
     try {
       if (!this.userKey) {
-        await this.initializeSimpleEncryption();
+        await this.getSimplePermanentKey();
       }
       
       const decrypted = await crypto.subtle.decrypt(
@@ -255,28 +191,186 @@ class SimpleEncryptionManager {
       
     } catch (error) {
       console.error("Error decrypting file:", error);
+      throw new Error("Failed to decrypt file. Make sure you're logged in with the correct account.");
+    }
+  }
+  
+  // لا حاجة لـ clearKeys هنا لأن المفتاح مشتق دائماً من بيانات المستخدم
+  async clearKeys() {
+    this.userKey = null;
+  }
+}
+
+// =====================================================
+// Hybrid Encryption Manager (للتوافق مع الملفات القديمة والجديدة)
+// =====================================================
+
+class HybridEncryptionManager {
+  constructor() {
+    this.userKey = null;
+    this.currentUserId = null;
+    this.legacyKey = null; // للملفات القديمة
+  }
+  
+  async initialize() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      
+      this.currentUserId = user.id;
+      
+      // 1. المفتاح الدائم للملفات الجديدة
+      this.userKey = await this.getPermanentKey(user.id, user.email);
+      
+      // 2. محاولة تحميل المفتاح القديم للملفات القديمة
+      const legacyKeyData = localStorage.getItem(`legacy_key_${user.id}`);
+      if (legacyKeyData) {
+        try {
+          const rawKey = base64ToArrayBuffer(legacyKeyData);
+          this.legacyKey = await crypto.subtle.importKey(
+            "raw",
+            rawKey,
+            { name: "AES-GCM" },
+            false,
+            ["encrypt", "decrypt"]
+          );
+        } catch (e) {
+          console.warn("Could not load legacy key:", e);
+        }
+      }
+      
+      return this.userKey;
+      
+    } catch (error) {
+      console.error("Error initializing hybrid encryption:", error);
       throw error;
     }
   }
   
-  // مسح المفاتيح عند تسجيل الخروج
-  async clearKeys() {
-    this.userKey = null;
+  async getPermanentKey(userId, userEmail) {
+    // طريقة مبسطة لكنها فعالة
+    const encoder = new TextEncoder();
+    
+    // إنشاء مادة أولية للمفتاح
+    const baseString = `${userId}:${userEmail}:permanent:encryption:key`;
+    const baseData = encoder.encode(baseString);
+    
+    // استخدام SHA-256 ثم أخذ أول 32 بايت
+    const hash = await crypto.subtle.digest("SHA-256", baseData);
+    const hashArray = new Uint8Array(hash);
+    
+    // تأكد من أن لدينا 32 بايت للمفتاح AES-256
+    const keyData = hashArray.slice(0, 32);
+    
+    // استيراد كمفتاح AES
+    return await crypto.subtle.importKey(
+      "raw",
+      keyData,
+      { name: "AES-GCM" },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+  
+  async encryptFile(file) {
+    if (!this.userKey) {
+      await this.initialize();
+    }
+    
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const fileBuffer = await file.arrayBuffer();
+    
+    const encrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      this.userKey,
+      fileBuffer
+    );
+    
+    return { encrypted, iv };
+  }
+  
+  async decryptFile(buffer, iv, isLegacy = false) {
+    try {
+      if (isLegacy && this.legacyKey) {
+        // محاولة فك تشفير باستخدام المفتاح القديم
+        try {
+          const decrypted = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv },
+            this.legacyKey,
+            buffer
+          );
+          return new Blob([decrypted]);
+        } catch (e) {
+          console.warn("Legacy key failed, trying permanent key...");
+        }
+      }
+      
+      // استخدام المفتاح الدائم
+      if (!this.userKey) {
+        await this.initialize();
+      }
+      
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        this.userKey,
+        buffer
+      );
+      
+      return new Blob([decrypted]);
+      
+    } catch (error) {
+      console.error("Decryption error:", error);
+      
+      // محاولة أخيرة: البحث عن المفتاح القديم في localStorage
+      if (!isLegacy) {
+        try {
+          const legacyKeyData = localStorage.getItem(`user_aes_key`);
+          if (legacyKeyData) {
+            const rawKey = base64ToArrayBuffer(legacyKeyData);
+            const tempKey = await crypto.subtle.importKey(
+              "raw",
+              rawKey,
+              { name: "AES-GCM" },
+              false,
+              ["encrypt", "decrypt"]
+            );
+            
+            const decrypted = await crypto.subtle.decrypt(
+              { name: "AES-GCM", iv },
+              tempKey,
+              buffer
+            );
+            
+            return new Blob([decrypted]);
+          }
+        } catch (e) {
+          console.error("Final fallback failed:", e);
+        }
+      }
+      
+      throw new Error("Cannot decrypt file. You might need the original encryption key.");
+    }
+  }
+  
+  // عند إرسال ملف جديد، حفظ المفتاح الحالي كمفتاح قديم للمستقبل
+  async backupCurrentKeyAsLegacy() {
     if (this.currentUserId) {
-      sessionStorage.removeItem(`user_key_${this.currentUserId}`);
-      sessionStorage.removeItem(`user_key_info_${this.currentUserId}`);
+      const legacyKeyData = localStorage.getItem(`user_aes_key`);
+      if (legacyKeyData) {
+        localStorage.setItem(`legacy_key_${this.currentUserId}`, legacyKeyData);
+      }
     }
   }
 }
 
-// إنشاء مدير التشفير العالمي
-const encryptionManager = new SimpleEncryptionManager();
-
 // =====================================================
-// Helper Functions (دوال مساعدة)
+// Implementation in dashboard.js (الجزء المعدل فقط)
 // =====================================================
 
-// Convert ArrayBuffer ↔ Base64
+// استبدال إدارة التشفير القديمة بهذه
+const encryptionManager = new HybridEncryptionManager();
+
+// باقي الدوال المساعدة كما هي...
 function arrayBufferToBase64(buffer) {
   let binary = "";
   const bytes = new Uint8Array(buffer);
@@ -291,320 +385,17 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
-// Format date function
-function formatDate(dateString) {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-}
-
-// =====================================================
-// Supabase setup
-// =====================================================
-const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// =====================================================
-// Messages
-// =====================================================
-function showMessage(text, type = "error") {
-  const msgBox = document.getElementById("messageBox");
-  msgBox.textContent = text;
-  msgBox.className = `msgBox ${type === 'error' ? 'errorMsg' : 'successMsg'}`;
-  msgBox.style.display = 'block';
-
-  if (type === 'success') {
-    setTimeout(() => msgBox.style.display = 'none', 3000);
-  }
-}
-
-// =====================================================
-// Employees Management
-// =====================================================
-
-// Load employees list from employees table
-async function loadEmployees() {
-  const employeesList = document.getElementById('employeesList');
-  employeesList.innerHTML = '';
-
-  const { data, error } = await supabase
-    .from("employees")
-    .select("id, name, email");
-
-  if (error) {
-    console.error("Error loading employees:", error);
-    showMessage("Error loading employees list: " + error.message);
-    return;
-  }
-
-  if (!data || data.length === 0) {
-    employeesList.innerHTML = '<p>No employees found</p>';
-    return;
-  }
-
-  data.forEach(emp => {
-    const div = document.createElement("div");
-    div.className = "employee-checkbox";
-    div.innerHTML = `
-      <label>
-        <input type="checkbox" class="employee-checkbox" value="${emp.id}">
-        ${emp.name} (${emp.email})
-      </label>
-    `;
-    employeesList.appendChild(div);
-  });
-}
-
-// Get selected employees
-function getSelectedEmployees() {
-  const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
-  const selectedEmployees = [];
-  
-  checkboxes.forEach(checkbox => {
-    if (checkbox.checked) {
-      selectedEmployees.push(checkbox.value);
-    }
-  });
-  
-  return selectedEmployees;
-}
-
-// =====================================================
-// File Encryption & Sending
-// =====================================================
-
-// Send file
+// عند إرسال الملف، نضيف هذا
 async function encryptAndSendFile() {
-  const fileInput = document.getElementById('fileInput');
-  const selectAllCheckbox = document.getElementById('selectAllEmployees');
+  // ... الكود الحالي ...
   
-  const file = fileInput.files[0];
-  const sendToAll = selectAllCheckbox.checked;
-  const selectedEmployees = getSelectedEmployees();
-
-  if (!file) return showMessage("Please select a file");
-  if (!sendToAll && selectedEmployees.length === 0) return showMessage("Please select at least one employee");
-
-  try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      showMessage("Please login again");
-      return;
-    }
-
-    // الحصول على اسم المرسل
-    const { data: currentEmployee, error: empError } = await supabase
-      .from("employees")
-      .select("name")
-      .eq("id", user.id)
-      .single();
-
-    if (empError || !currentEmployee) {
-      showMessage("Error: Cannot find employee data");
-      return;
-    }
-
-    const senderName = currentEmployee.name;
-    const fileName = `${Date.now()}_${file.name}`;
-
-    showMessage("Encrypting and sending file...", "info");
-
-    // Encrypt file (تشفير تلقائي)
-    const { encrypted, iv } = await encryptionManager.encryptFile(file);
-
-    // Combine IV + encrypted data
-    const combined = new Uint8Array(iv.byteLength + encrypted.byteLength);
-    combined.set(iv, 0);
-    combined.set(new Uint8Array(encrypted), iv.byteLength);
-
-    // Upload encrypted file
-    const saudi = new Date().toLocaleString('en-SA', {
-      timeZone: 'Asia/Riyadh'
-    });
-    
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("files")
-      .upload(fileName, combined.buffer);
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      showMessage("Upload error: " + uploadError.message);
-      return;
-    }
-
-    // Get all employees if "Send to All" is selected
-    let employeeData = [];
-    if (sendToAll) {
-      const { data: allEmployees, error: empError } = await supabase
-        .from("employees")
-        .select("id, name");
-      
-      if (empError) {
-        showMessage("Error fetching employees: " + empError.message);
-        return;
-      }
-      
-      employeeData = allEmployees;
-    } else {
-      // الحصول على بيانات الموظفين المختارين
-      const { data: selectedEmployeesData, error: selError } = await supabase
-        .from("employees")
-        .select("id, name")
-        .in("id", selectedEmployees);
-      
-      if (selError) {
-        showMessage("Error fetching selected employees: " + selError.message);
-        return;
-      }
-      
-      employeeData = selectedEmployeesData;
-    }
-
-    // Save data in shared_files for each employee
-    const currentUser = user.id;
-    const fileRecords = employeeData.map(employee => ({
-      file_name: file.name,
-      storage_path: uploadData.path,
-      allowed_user_id: employee.id,
-      uploaded_by: currentUser,
-      created_at: saudi,
-      sender_name: senderName,
-      receiver_name: employee.name
-    }));
-
-    // Insert records into shared_files table
-    const { error: dbError } = await supabase
-      .from("shared_files")
-      .insert(fileRecords);
-
-    if (dbError) {
-      console.error("Database error:", dbError);
-      showMessage("Database error: " + dbError.message);
-      
-      // Try to delete the uploaded file if DB insertion fails
-      await supabase.storage.from("files").remove([uploadData.path]);
-      return;
-    }
-
-    showMessage(`File sent successfully to ${employeeData.length} employee(s)!`, "success");
-    fileInput.value = "";
-    
-    // Reset options
-    selectAllCheckbox.checked = false;
-    const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
-    checkboxes.forEach(checkbox => {
-      checkbox.checked = false;
-      checkbox.disabled = false;
-    });
-
-    // Reload received files
-    setTimeout(() => {
-      loadReceivedFiles();
-    }, 1000);
-  } 
-  catch (err) {
-    console.error("Unexpected error:", err);
-    showMessage("Unexpected error: " + err.message);
-  }
+  // بعد نجاح الإرسال، احفظ نسخة احتياطية من المفتاح
+  await encryptionManager.backupCurrentKeyAsLegacy();
+  
+  // ... باقي الكود ...
 }
 
-// =====================================================
-// File Management
-// =====================================================
-
-// Load received files
-async function loadReceivedFiles() {
-  try {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) {
-      console.error("Auth error:", userError);
-      showMessage("Please login again");
-      return;
-    }
-
-    const currentUser = userData.user;
-
-    // Get files where current user is either recipient or sender
-    const { data: files, error } = await supabase
-      .from("shared_files")
-      .select("*")
-      .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error("Error loading files:", error);
-      showMessage("Error loading files: " + error.message);
-      return;
-    }
-
-    const receivedList = document.getElementById("receivedList");
-    receivedList.innerHTML = "";
-
-    if (!files || files.length === 0) {
-      receivedList.innerHTML = "<p>No files received yet.</p>";
-      return;
-    }
-
-    // Separate received files from sent files
-    const receivedFiles = files.filter(file => file.allowed_user_id === currentUser.id);
-    const sentFiles = files.filter(file => file.uploaded_by === currentUser.id);
-
-    if (receivedFiles.length > 0) {
-      const receivedHeader = document.createElement("h3");
-      receivedHeader.textContent = "Received Files";
-      receivedHeader.style.marginTop = "20px";
-      receivedHeader.style.color = "#333";
-      receivedList.appendChild(receivedHeader);
-
-      receivedFiles.forEach(file => {
-        const div = document.createElement("div");
-        div.className = "file-item";
-        div.innerHTML = `
-          <div>
-            <strong>${file.file_name}</strong><br />
-            <small>From: ${file.sender_name} • Received: ${formatDate(file.created_at)}</small>
-          </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
-        `;
-        receivedList.appendChild(div);
-      });
-    }
-
-    if (sentFiles.length > 0) {
-      const sentHeader = document.createElement("h3");
-      sentHeader.textContent = "Sent Files";
-      sentHeader.style.marginTop = "20px";
-      sentHeader.style.color = "#333";
-      receivedList.appendChild(sentHeader);
-
-      sentFiles.forEach(file => {
-        const div = document.createElement("div");
-        div.className = "file-item";
-        div.innerHTML = `
-          <div>
-            <strong>${file.file_name}</strong><br />
-            <small>Sent to: ${file.receiver_name} • ${formatDate(file.created_at)}</small>
-          </div>
-          <button onclick="downloadFile('${file.storage_path}', '${file.file_name}')">Download</button>
-        `;
-        receivedList.appendChild(div);
-      });
-    }
-
-  } catch (err) {
-    console.error("Unexpected error in loadReceivedFiles:", err);
-    showMessage("Error loading files");
-  }
-}
-
-// Download file
+// عند التحميل، حاول اكتشاف نوع الملف
 async function downloadFile(path, fileName) {
   try {
     const { data, error } = await supabase.storage.from("files").download(path);
@@ -614,73 +405,67 @@ async function downloadFile(path, fileName) {
 
     // Extract IV (first 12 bytes)
     const iv = arrayBuffer.slice(0, 12);
-
-    // Extract encrypted content
     const encrypted = arrayBuffer.slice(12);
 
-    // Decrypt (فك تشفير تلقائي)
-    const blob = await encryptionManager.decryptFile(encrypted, iv);
-
-    // Download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.click();
-
-    URL.revokeObjectURL(url);
+    // محاولة فك التشفير مع التعرف التلقائي على نوع المفتاح
+    try {
+      // أولاً: حاول بالمفتاح الدائم (الملفات الجديدة)
+      const blob = await encryptionManager.decryptFile(encrypted, iv, false);
+      
+      // التحميل
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      // إذا فشل، حاول بالمفتاح القديم
+      console.log("Trying legacy decryption...");
+      try {
+        const blob = await encryptionManager.decryptFile(encrypted, iv, true);
+        
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        showMessage("File decrypted with legacy system", "info");
+        
+      } catch (legacyError) {
+        showMessage("Cannot decrypt file. Please contact the sender.", "error");
+      }
+    }
 
   } catch (err) {
-    showMessage("Decrypt error: " + err.message);
+    showMessage("Download error: " + err.message);
   }
 }
 
-// =====================================================
-// Logout
-// =====================================================
-async function logout() {
-  await encryptionManager.clearKeys();
-  await supabase.auth.signOut();
-  window.location.href = "index.html";
-}
-
-// =====================================================
-// On page load
-// =====================================================
+// عند تحميل الصفحة
 document.addEventListener("DOMContentLoaded", async () => {
   try {
-    // Check if user is authenticated
+    // التحقق من المستخدم
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       window.location.href = "index.html";
       return;
     }
 
-    // Initialize encryption manager (استخدم الطريقة البسيطة)
-    await encryptionManager.initializeSimpleEncryption();
+    // تهيئة نظام التشفير الهجين
+    await encryptionManager.initialize();
     
-    // Load data
+    // تحميل البيانات
     await loadEmployees();
     await loadReceivedFiles();
-
-    // Add event listeners
-    document.getElementById("encryptBtn").addEventListener("click", encryptAndSendFile);
-    document.getElementById("logoutBtn").addEventListener("click", logout);
     
-    // Add event for "Send to All Employees" option
-    document.getElementById("selectAllEmployees").addEventListener("change", function() {
-      const checkboxes = document.querySelectorAll('.employee-checkbox input[type="checkbox"]');
-      checkboxes.forEach(checkbox => {
-        checkbox.checked = this.checked;
-        checkbox.disabled = this.checked;
-      });
-    });
+    // ... باقي الكود كما هو ...
 
   } catch (error) {
     console.error("Initialization error:", error);
     showMessage("Error initializing dashboard");
   }
 });
-
-// Make functions available globally
-window.downloadFile = downloadFile;
