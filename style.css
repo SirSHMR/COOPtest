@@ -1,13 +1,14 @@
 /* عام */
 body {
-  font-family: Poppins, sans-serif;
-  background: #f2f5f9;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   margin: 0;
   padding: 0;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  direction: rtl;
 }
 
 /* Login Box */
@@ -15,41 +16,56 @@ body {
   background: white;
   padding: 40px;
   border-radius: 20px;
-  box-shadow: 0 0 15px rgba(0,0,0,0.1);
-  width: 320px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  width: 350px;
   text-align: center;
-  margin-top: -100px;
+  margin: 20px;
+}
+
+.login-box h2 {
+  color: #2c3e50;
+  margin-bottom: 30px;
+  font-weight: 600;
 }
 
 .login-box input {
   width: 100%;
-  padding: 12px;
-  margin: 10px 0;
+  padding: 14px;
+  margin: 12px 0;
   border-radius: 10px;
-  border: 1px solid #ddd;
+  border: 1px solid #e1e8ed;
   box-sizing: border-box;
-  font-family: Poppins, sans-serif;
+  font-size: 16px;
+  transition: border 0.3s;
+}
+
+.login-box input:focus {
+  border-color: #3498db;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
 }
 
 .login-box button {
   width: 100%;
-  padding: 12px;
-  background: #007bff;
+  padding: 14px;
+  background: linear-gradient(to right, #3498db, #2980b9);
   color: white;
   border: none;
   border-radius: 10px;
   cursor: pointer;
   font-weight: bold;
-  font-family: Poppins, sans-serif;
-  margin-top: 10px;
+  font-size: 16px;
+  margin-top: 15px;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .login-box button:hover {
-  background: #0056b3;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
 }
 
 .message {
-  margin-top: 10px;
+  margin: 15px 0;
   padding: 12px;
   border-radius: 10px;
   font-size: 14px;
@@ -59,21 +75,21 @@ body {
 }
 
 .message.error {
-  background: #ffdddd;
-  color: #d60000;
-  border-left: 5px solid #d60000;
+  background: #ffebee;
+  color: #c62828;
+  border-left: 4px solid #c62828;
 }
 
 .message.success {
-  background: #ddffdd;
-  color: #0c8b0c;
-  border-left: 5px solid #0c8b0c;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-left: 4px solid #2e7d32;
 }
 
 /* Dashboard Container */
 .dashboard-container {
   width: 100%;
-  max-width: 500px;
+  max-width: 800px;
   padding: 20px;
   box-sizing: border-box;
 }
@@ -83,8 +99,8 @@ body {
   background: white;
   padding: 30px;
   border-radius: 16px;
-  box-shadow: 0 0 15px rgba(0,0,0,0.1);
-  text-align: center;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+  text-align: right;
   margin-bottom: 30px;
   width: 100%;
   box-sizing: border-box;
@@ -92,128 +108,161 @@ body {
 
 .container h2 {
   margin-top: 0;
-  color: #333;
-  margin-bottom: 20px;
+  color: #2c3e50;
+  margin-bottom: 25px;
   font-size: 24px;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 10px;
 }
 
 .container label {
   display: block;
-  text-align: left;
+  text-align: right;
   margin-bottom: 8px;
-  font-weight: 500;
-  color: #333;
-  font-size: 14px;
+  font-weight: 600;
+  color: #34495e;
+  font-size: 15px;
 }
 
 /* Input and Select Styles */
 input[type="file"] {
   width: 100%;
   padding: 12px;
-  margin: 10px 0 15px;
+  margin: 15px 0;
   border-radius: 10px;
-  border: 1px solid #ccc;
+  border: 2px dashed #bdc3c7;
   box-sizing: border-box;
-  font-family: Poppins, sans-serif;
-  background: white;
+  background: #f8f9fa;
+  cursor: pointer;
+  transition: border 0.3s;
+}
+
+input[type="file"]:hover {
+  border-color: #3498db;
+}
+
+input[type="file"]::file-selector-button {
+  background: linear-gradient(to right, #3498db, #2980b9);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  margin-left: 10px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.3s;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background: linear-gradient(to right, #2980b9, #1c639c);
 }
 
 /* Button Styles */
 button {
-  padding: 12px;
-  background-color: #007bff;
+  padding: 14px 24px;
+  background: linear-gradient(to right, #3498db, #2980b9);
   border: none;
   color: white;
   border-radius: 10px;
   cursor: pointer;
   font-weight: bold;
-  font-family: Poppins, sans-serif;
-  margin-top: 10px;
-  font-size: 14px;
-  transition: background-color 0.3s;
+  font-size: 15px;
+  margin-top: 15px;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 button:hover {
-  background-color: #0056b3;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
 }
 
 /* Message Styles */
 .msgBox {
-  margin-bottom: 15px;
-  padding: 12px;
+  margin-bottom: 20px;
+  padding: 15px;
   border-radius: 10px;
   display: none;
   font-size: 14px;
   font-weight: 500;
-  text-align: left;
+  text-align: right;
 }
 
 .errorMsg {
-  background: #ffdddd;
-  color: #d60000;
-  border-left: 5px solid #d60000;
+  background: #ffebee;
+  color: #c62828;
+  border-right: 4px solid #c62828;
+  border-left: none;
 }
 
 .successMsg {
-  background: #ddffdd;
-  color: #0c8b0c;
-  border-left: 5px solid #0c8b0c;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-right: 4px solid #2e7d32;
+  border-left: none;
 }
 
 /* Received Files */
 .received-files {
   margin-top: 20px;
-  text-align: left;
+  text-align: right;
 }
 
 .file-item {
-  padding: 15px;
-  margin-bottom: 10px;
-  border-radius: 10px;
-  background: #f7f7f7;
-  border: 1px solid #ddd;
+  padding: 20px;
+  margin-bottom: 15px;
+  border-radius: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: transform 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .file-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  background: white;
 }
 
 .file-item strong {
-  color: #333;
-  font-size: 14px;
+  color: #2c3e50;
+  font-size: 16px;
+  display: block;
+  margin-bottom: 5px;
 }
 
 .file-item small {
-  color: #666;
-  font-size: 12px;
+  color: #7f8c8d;
+  font-size: 13px;
 }
 
 .file-item button {
-  width: auto;
-  padding: 8px 15px;
   margin: 0;
-  font-size: 12px;
+  padding: 8px 16px;
+  font-size: 14px;
+  background: linear-gradient(to right, #27ae60, #219653);
+}
+
+.file-item button:hover {
+  background: linear-gradient(to right, #219653, #1e8449);
+  box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
 }
 
 /* Employees List Styles */
 .employees-list {
-  max-height: 200px;
+  max-height: 250px;
   overflow-y: auto;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 10px;
-  margin: 10px 0 15px;
+  border: 1px solid #e1e8ed;
+  border-radius: 12px;
+  padding: 15px;
+  margin: 15px 0 20px;
   background-color: white;
-  text-align: left;
+  text-align: right;
 }
 
 .employee-checkbox {
-  padding: 10px 8px;
+  padding: 12px 10px;
   border-bottom: 1px solid #f0f0f0;
   transition: background-color 0.2s;
 }
@@ -230,15 +279,15 @@ button:hover {
   display: flex;
   align-items: center;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   margin: 0;
   font-weight: normal;
-  color: #555;
+  color: #2c3e50;
 }
 
 .employee-checkbox input[type="checkbox"] {
-  margin-right: 12px;
-  transform: scale(1.1);
+  margin-left: 12px;
+  transform: scale(1.2);
   cursor: pointer;
 }
 
@@ -249,10 +298,10 @@ button:hover {
 
 /* Select All Container */
 .select-all-container {
-  margin-bottom: 15px;
-  padding: 12px;
+  margin-bottom: 20px;
+  padding: 15px;
   background-color: #f8f9fa;
-  border-radius: 10px;
+  border-radius: 12px;
   border: 1px solid #e9ecef;
 }
 
@@ -261,61 +310,79 @@ button:hover {
   align-items: center;
   font-weight: bold;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 16px;
   margin: 0;
-  color: #333;
+  color: #2c3e50;
 }
 
 .select-all-container input[type="checkbox"] {
-  margin-right: 12px;
-  transform: scale(1.1);
+  margin-left: 12px;
+  transform: scale(1.2);
   cursor: pointer;
 }
 
-/* Logout Button */
+/* Dashboard Actions */
+.dashboard-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.dashboard-actions button {
+  flex: 1;
+  max-width: 250px;
+}
+
+#pinBtn {
+  background: linear-gradient(to right, #9b59b6, #8e44ad);
+}
+
+#pinBtn:hover {
+  background: linear-gradient(to right, #8e44ad, #7d3c98);
+  box-shadow: 0 5px 15px rgba(155, 89, 182, 0.3);
+}
+
 #logoutBtn {
-  width: 200px;
-  margin-top: 20px;
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  background-color: #6c757d;
+  background: linear-gradient(to right, #e74c3c, #c0392b);
 }
 
 #logoutBtn:hover {
-  background-color: #5a6268;
-}
-
-/* Scrollbar Styling */
-.employees-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.employees-list::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 3px;
-}
-
-.employees-list::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
-}
-
-.employees-list::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: linear-gradient(to right, #c0392b, #a93226);
+  box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
 }
 
 /* Headers in received files */
 .received-files h3 {
-  margin: 0 0 15px 0;
+  margin: 0 0 20px 0;
   padding-bottom: 10px;
-  border-bottom: 2px solid #007bff;
-  font-size: 18px;
-  color: #333;
+  border-bottom: 2px solid #3498db;
+  font-size: 20px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+/* Scrollbar Styling */
+.employees-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.employees-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.employees-list::-webkit-scrollbar-thumb {
+  background: #bdc3c7;
+  border-radius: 4px;
+}
+
+.employees-list::-webkit-scrollbar-thumb:hover {
+  background: #95a5a6;
 }
 
 /* Responsive Design */
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .dashboard-container {
     padding: 10px;
   }
@@ -328,20 +395,12 @@ button:hover {
     width: 90%;
     margin: 20px auto;
   }
-}
-
-/* File input styling */
-input[type="file"]::file-selector-button {
-  background: #007bff;
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 6px;
-  margin-right: 10px;
-  cursor: pointer;
-  font-family: Poppins, sans-serif;
-}
-
-input[type="file"]::file-selector-button:hover {
-  background: #0056b3;
+  
+  .dashboard-actions {
+    flex-direction: column;
+  }
+  
+  .dashboard-actions button {
+    max-width: 100%;
+  }
 }
