@@ -1,4 +1,4 @@
-// --- Simple Encryption Manager (سهل الاستخدام) ---
+// --- Simple Encryption Manager (معدل) ---
 
 class SimpleEncryptionManager {
   constructor() {
@@ -24,38 +24,19 @@ class SimpleEncryptionManager {
           "raw",
           rawKey,
           "AES-GCM",
-          false,
+          false, // ليس extractable
           ["encrypt", "decrypt"]
         );
         return this.userKey;
       }
       
-      // 3. إنشاء مفتاح جديد من معرف المستخدم
-      const encoder = new TextEncoder();
-      const userData = encoder.encode(user.id + user.email);
-      
-      // اشتقاق مفتاح من بيانات المستخدم
-      const keyMaterial = await crypto.subtle.importKey(
-        "raw",
-        userData,
-        "PBKDF2",
-        false,
-        ["deriveKey"]
-      );
-      
-      // استخدام salt مشتق من user_id
-      const salt = encoder.encode(user.id).slice(0, 16);
-      
-      this.userKey = await crypto.subtle.deriveKey(
+      // 3. إنشاء مفتاح عشوائي جديد (ليس مشتقاً من كلمة مرور)
+      this.userKey = await crypto.subtle.generateKey(
         {
-          name: "PBKDF2",
-          salt: salt,
-          iterations: 100000,
-          hash: "SHA-256"
+          name: "AES-GCM",
+          length: 256
         },
-        keyMaterial,
-        { name: "AES-GCM", length: 256 },
-        false,
+        true, // قابل للتصدير
         ["encrypt", "decrypt"]
       );
       
@@ -71,37 +52,211 @@ class SimpleEncryptionManager {
     }
   }
   
+  // بديل: إنشاء مفتاح مشتق من بيانات المستخدم (ولكن قابل للتصدير)
+  async initializeUserEncryptionV2() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      
+      this.currentUserId = user.id;
+      
+      // 1. تحقق من وجود مفتاح في sessionStorage
+      const storedKey = sessionStorage.getItem(`user_key_${user.id}`);
+      
+      if (storedKey) {
+        const rawKey = base64ToArrayBuffer(storedKey);
+        this.userKey = await crypto.subtle.importKey(
+          "raw",
+          rawKey,
+          "AES-GCM",
+          false,
+          ["encrypt", "decrypt"]
+        );
+        return this.userKey;
+      }
+      
+      // 2. إنشاء مفتاح باستخدام HMAC مع salt فريد
+      const encoder = new TextEncoder();
+      const userIdData = encoder.encode(user.id);
+      
+      // استخدام PBKDF2 لإنشاء مادة مفتاحية
+      const keyMaterial = await crypto.subtle.importKey(
+        "raw",
+        userIdData,
+        "PBKDF2",
+        false,
+        ["deriveBits"]
+      );
+      
+      // اشتقاق bits
+      const derivedBits = await crypto.subtle.deriveBits(
+        {
+          name: "PBKDF2",
+          salt: encoder.encode(user.email).slice(0, 16),
+          iterations: 10000,
+          hash: "SHA-256"
+        },
+        keyMaterial,
+        256
+      );
+      
+      // استيراد الـ bits كمفتاح AES
+      this.userKey = await crypto.subtle.importKey(
+        "raw",
+        derivedBits,
+        "AES-GCM",
+        false, // ليس extractable
+        ["encrypt", "decrypt"]
+      );
+      
+      // 3. تخزين البيانات المستخدمة لإعادة إنشاء المفتاح (وليس المفتاح نفسه)
+      const keyInfo = {
+        userId: user.id,
+        userEmail: user.email,
+        algorithm: "PBKDF2-AES-GCM"
+      };
+      sessionStorage.setItem(`user_key_info_${user.id}`, JSON.stringify(keyInfo));
+      
+      return this.userKey;
+      
+    } catch (error) {
+      console.error("Error initializing encryption V2:", error);
+      // الرجوع إلى الطريقة البسيطة
+      return this.initializeUserEncryption();
+    }
+  }
+  
+  // الطريقة البسيطة الموصى بها
+  async initializeSimpleEncryption() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      
+      this.currentUserId = user.id;
+      
+      // مفتاح تخزين مؤقت
+      const storageKey = `user_key_${user.id}`;
+      
+      // حاول تحميل المفتاح من الذاكرة المؤقتة
+      if (this.userKey) {
+        return this.userKey;
+      }
+      
+      // تحقق من sessionStorage
+      const storedKey = sessionStorage.getItem(storageKey);
+      if (storedKey) {
+        const rawKey = base64ToArrayBuffer(storedKey);
+        this.userKey = await crypto.subtle.importKey(
+          "raw",
+          rawKey,
+          "AES-GCM",
+          false,
+          ["encrypt", "decrypt"]
+        );
+        return this.userKey;
+      }
+      
+      // إنشاء مفتاح جديد عشوائي
+      this.userKey = await crypto.subtle.generateKey(
+        {
+          name: "AES-GCM",
+          length: 256
+        },
+        true, // قابل للتصدير للتخزين
+        ["encrypt", "decrypt"]
+      );
+      
+      // تخزين المفتاح في sessionStorage
+      const rawKey = await crypto.subtle.exportKey("raw", this.userKey);
+      sessionStorage.setItem(storageKey, arrayBufferToBase64(rawKey));
+      
+      return this.userKey;
+      
+    } catch (error) {
+      console.error("Error in simple encryption:", error);
+      
+      // خطة بديلة: استخدام مفتاح مشتق من user_id مباشرة
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
+        
+        // إنشاء مفتاح من user_id مباشرة (أقل أماناً ولكن يعمل)
+        const encoder = new TextEncoder();
+        const userIdData = encoder.encode(user.id + user.email);
+        
+        // تأكد من أن البيانات 256 بت (32 بايت)
+        let keyData;
+        if (userIdData.length < 32) {
+          // إذا كانت قصيرة، كررها
+          const repeated = new Uint8Array(32);
+          for (let i = 0; i < 32; i++) {
+            repeated[i] = userIdData[i % userIdData.length];
+          }
+          keyData = repeated;
+        } else {
+          keyData = userIdData.slice(0, 32);
+        }
+        
+        this.userKey = await crypto.subtle.importKey(
+          "raw",
+          keyData,
+          "AES-GCM",
+          false,
+          ["encrypt", "decrypt"]
+        );
+        
+        return this.userKey;
+        
+      } catch (fallbackError) {
+        console.error("Fallback also failed:", fallbackError);
+        return null;
+      }
+    }
+  }
+  
   // تشفير الملف
   async encryptFile(file) {
-    if (!this.userKey) {
-      await this.initializeUserEncryption();
+    try {
+      if (!this.userKey) {
+        await this.initializeSimpleEncryption();
+      }
+      
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const fileBuffer = await file.arrayBuffer();
+      
+      const encrypted = await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        this.userKey,
+        fileBuffer
+      );
+      
+      return { encrypted, iv };
+      
+    } catch (error) {
+      console.error("Error encrypting file:", error);
+      throw error;
     }
-    
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const fileBuffer = await file.arrayBuffer();
-    
-    const encrypted = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      this.userKey,
-      fileBuffer
-    );
-    
-    return { encrypted, iv };
   }
   
   // فك تشفير الملف
   async decryptFile(buffer, iv) {
-    if (!this.userKey) {
-      await this.initializeUserEncryption();
+    try {
+      if (!this.userKey) {
+        await this.initializeSimpleEncryption();
+      }
+      
+      const decrypted = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        this.userKey,
+        buffer
+      );
+      
+      return new Blob([decrypted]);
+      
+    } catch (error) {
+      console.error("Error decrypting file:", error);
+      throw error;
     }
-    
-    const decrypted = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      this.userKey,
-      buffer
-    );
-    
-    return new Blob([decrypted]);
   }
   
   // مسح المفاتيح عند تسجيل الخروج
@@ -109,6 +264,7 @@ class SimpleEncryptionManager {
     this.userKey = null;
     if (this.currentUserId) {
       sessionStorage.removeItem(`user_key_${this.currentUserId}`);
+      sessionStorage.removeItem(`user_key_info_${this.currentUserId}`);
     }
   }
 }
@@ -500,8 +656,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    // Initialize encryption manager
-    await encryptionManager.initializeUserEncryption();
+    // Initialize encryption manager (استخدم الطريقة البسيطة)
+    await encryptionManager.initializeSimpleEncryption();
     
     // Load data
     await loadEmployees();
