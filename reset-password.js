@@ -9,16 +9,68 @@ const client = window.supabase.createClient(
 // تجهيز session من رابط recovery
 async function initializeRecoverySession() {
 
-  const hash = window.location.hash.substring(1);
-  const params = new URLSearchParams(hash);
+  // هل يوجد session جاهز؟
+  const { data } =
+    await client.auth.getSession();
 
-  const access_token = params.get("access_token");
-  const refresh_token = params.get("refresh_token");
+  if (data.session) {
+    return true;
+  }
 
-  if (!access_token || !refresh_token) {
-    showMessage("Invalid or expired reset link");
+  // قراءة البيانات من الرابط
+  const hash =
+    window.location.hash;
+
+  if (!hash) {
+
+    showMessage(
+      "Invalid reset link"
+    );
+
     return false;
   }
+
+  const params =
+    new URLSearchParams(
+      hash.substring(1)
+    );
+
+  const access_token =
+    params.get("access_token");
+
+  const refresh_token =
+    params.get("refresh_token");
+
+  if (
+    !access_token ||
+    !refresh_token
+  ) {
+
+    showMessage(
+      "Reset link expired"
+    );
+
+    return false;
+  }
+
+  // إنشاء session
+  const { error } =
+    await client.auth.setSession({
+      access_token,
+      refresh_token
+    });
+
+  if (error) {
+
+    showMessage(
+      "Session expired"
+    );
+
+    return false;
+  }
+
+  return true;
+}
 
   const { error } = await client.auth.setSession({
     access_token,
