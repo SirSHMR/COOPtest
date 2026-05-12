@@ -173,7 +173,7 @@ document
     }
 
     const result = await clientt.auth.resetPasswordForEmail(email, {
-      redirectTo: "https://coo-ptest.vercel.app/reset-password.html"
+      redirectTo: "https://sirshmr.github.io/COOPtest/reset-password.html"
     });
 
     console.log("RESET RESULT:", result);
