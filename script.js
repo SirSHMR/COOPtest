@@ -1,7 +1,9 @@
+// Supabase Setup
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
 
-const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+const clientt = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     detectSessionInUrl: true,
     persistSession: true,
@@ -9,55 +11,178 @@ const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
+
+// Message Function
 function showMessage(text, type = "error") {
   const msg = document.getElementById("message");
+  if (!msg) return;
   msg.textContent = text;
   msg.className = "message " + type;
   msg.style.display = "block";
 }
 
-async function initializeRecoverySession() {
-  // انتظر Supabase يعالج الـ token من الـ URL تلقائياً
-  await new Promise(resolve => setTimeout(resolve, 500));
 
-  const { data, error } = await client.auth.getSession();
-
-  if (data?.session) {
-    return true;
-  }
-
-  showMessage("Invalid or expired reset link");
-  return false;
-}
-
-async function updatePassword() {
-  const ready = await initializeRecoverySession();
-  if (!ready) return;
-
-  const password = document.getElementById("newPassword").value.trim();
-  const confirmPassword = document.getElementById("confirmPassword").value.trim();
-
-  if (!password) {
-    showMessage("Please enter a new password");
-    return;
-  }
-
-  if (password !== confirmPassword) {
-    showMessage("Passwords do not match");
-    return;
-  }
-
-  const { error } = await client.auth.updateUser({ password });
+// Helper: Get login attempts
+async function getAttempts(email) {
+  const { data, error } = await clientt
+    .from("login_attempts")
+    .select("*")
+    .eq("email", email)
+    .maybeSingle();
 
   if (error) {
-    showMessage(error.message);
+    console.error("Error fetching attempts:", error);
+    return null;
+  }
+  return data;
+}
+
+
+// Helper: Save failed login
+async function registerFail(email) {
+  const user = await getAttempts(email);
+  const now = new Date().toLocaleString("en-SA", { timeZone: "Asia/Riyadh" });
+
+  let attempts = 1;
+  let lockUntil = null;
+  let lockMinutes = null;
+
+  if (user) {
+    attempts = user.attempts + 1;
+
+    if (attempts >= 3) {
+      const nowMs = Date.now();
+      const baseDuration = 5 * 60 * 1000;
+      const multiplier = Math.pow(2, attempts - 3);
+      const ban = baseDuration * multiplier;
+
+      lockMinutes = 5 * multiplier;
+      lockUntil = nowMs + ban;
+    }
+  }
+
+  await clientt.from("login_attempts").upsert({
+    email,
+    attempts,
+    lock_until: lockUntil,
+    lock_minutes: lockMinutes,
+    last_attempt_time: now,
+  });
+}
+
+
+// Helper: Reset attempts
+async function resetAttempts(email) {
+  await clientt.from("login_attempts").delete().eq("email", email);
+}
+
+
+// Helper: Record Successful Login
+async function recordSuccessLogin(email) {
+  const saudi = new Date().toLocaleString("en-SA", {
+    timeZone: "Asia/Riyadh",
+  });
+
+  const { error } = await clientt.from("login_success_log").insert({
+    email: email,
+    login_time: saudi,
+  });
+
+  if (error) console.error("Error saving login success:", error);
+}
+
+
+// Login Function
+async function loginUser() {
+  const email = document.getElementById("Email").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if (!email || !password) {
+    showMessage("Please enter both email and password");
     return;
   }
 
-  showMessage("Password updated successfully ✅", "success");
-  setTimeout(() => {
-    window.location.href = "index.html";
-  }, 2000);
+  const user = await getAttempts(email);
+
+  if (user && user.lock_until && Date.now() < user.lock_until) {
+    const remaining = Math.ceil((user.lock_until - Date.now()) / 60000);
+    showMessage(`Too many attempts. Try again after ${remaining} minutes.`);
+    return;
+  }
+
+  try {
+    const { data, error } = await clientt.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      await registerFail(email);
+      showMessage("Invalid email or password");
+      return;
+    }
+
+    if (data.user) {
+      await resetAttempts(email);
+      await recordSuccessLogin(email);
+
+      showMessage("Login successful! Redirecting...", "success");
+
+      setTimeout(() => {
+        window.location.href = "dashboard.html";
+      }, 1500);
+    }
+  } catch (err) {
+    console.error(err);
+    showMessage("Network error. Please try again.");
+  }
 }
 
-document.getElementById("resetBtn").addEventListener("click", updatePassword);
+
+// Event Listeners
+document.addEventListener("DOMContentLoaded", function () {
+  const loginBtn = document.getElementById("loginBtn");
+  if (loginBtn) loginBtn.addEventListener("click", loginUser);
+
+  document.getElementById("Email").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") loginUser();
+  });
+
+  document.getElementById("password").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") loginUser();
+  });
+});
+
+
+// Forgot Password
+let resetInProgress = false;
+
+document
+  .getElementById("forgotPassword")
+  .addEventListener("click", async () => {
+
+    if (resetInProgress) return;
+    resetInProgress = true;
+
+    const email = document.getElementById("Email").value.trim();
+
+    if (!email) {
+      showMessage("Enter your email first");
+      resetInProgress = false;
+      return;
+    }
+
+    const result = await clientt.auth.resetPasswordForEmail(email, {
+      redirectTo: "https://coo-ptest.vercel.app/reset-password.html"
+    });
+
+    console.log("RESET RESULT:", result);
+
+    if (result.error) {
+      showMessage(result.error.message);
+      resetInProgress = false;
+      return;
+    }
+
+    showMessage("Password reset link sent", "success");
+  });
