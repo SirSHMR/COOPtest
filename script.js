@@ -146,3 +146,36 @@ document.addEventListener("DOMContentLoaded", function () {
     if (e.key === "Enter") loginUser();
   });
 });
+
+document
+.getElementById("forgotPassword")
+.addEventListener("click", async () => {
+
+  const email =
+    document.getElementById("Email").value.trim();
+
+  if (!email) {
+    showMessage("Enter your email first");
+    return;
+  }
+
+  const { error } =
+    await clientt.auth.resetPasswordForEmail(
+      email,
+      {
+        redirectTo:
+        "https://YOUR_GITHUB_LINK/reset-password.html"
+      }
+    );
+
+  if (error) {
+    showMessage(error.message);
+    return;
+  }
+
+  showMessage(
+    "Password reset link sent",
+    "success"
+  );
+
+});
