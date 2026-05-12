@@ -1,15 +1,29 @@
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
 
-const client = window.supabase.createClient(
+onst client =
+window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
 );
 
-// تجهيز session من رابط recovery
+
+function showMessage(text, type = "error") {
+
+  const msg =
+    document.getElementById("message");
+
+  msg.textContent = text;
+  msg.className =
+    "message " + type;
+
+  msg.style.display = "block";
+}
+
+
+// تجهيز session من رابط الإيميل
 async function initializeRecoverySession() {
 
-  // هل يوجد session جاهز؟
   const { data } =
     await client.auth.getSession();
 
@@ -17,7 +31,6 @@ async function initializeRecoverySession() {
     return true;
   }
 
-  // قراءة البيانات من الرابط
   const hash =
     window.location.hash;
 
@@ -53,7 +66,6 @@ async function initializeRecoverySession() {
     return false;
   }
 
-  // إنشاء session
   const { error } =
     await client.auth.setSession({
       access_token,
@@ -72,46 +84,38 @@ async function initializeRecoverySession() {
   return true;
 }
 
-  const { error } = await client.auth.setSession({
-    access_token,
-    refresh_token
-  });
 
-  if (error) {
-    showMessage("Recovery link expired");
-    return false;
-  }
-
-  return true;
-}
-
-
-function showMessage(text, type = "error") {
-  const msg = document.getElementById("message");
-
-  msg.textContent = text;
-  msg.className = "message " + type;
-  msg.style.display = "block";
-}
-
-
+// تغيير كلمة المرور
 async function updatePassword() {
 
-  const sessionReady =
+  const ready =
     await initializeRecoverySession();
 
-  if (!sessionReady) return;
+  if (!ready) return;
+
 
   const password =
-    document.getElementById("newPassword").value.trim();
+    document
+    .getElementById("newPassword")
+    .value
+    .trim();
 
   const confirmPassword =
-    document.getElementById("confirmPassword").value.trim();
+    document
+    .getElementById("confirmPassword")
+    .value
+    .trim();
+
 
   if (password !== confirmPassword) {
-    showMessage("Passwords do not match");
+
+    showMessage(
+      "Passwords do not match"
+    );
+
     return;
   }
+
 
   const { error } =
     await client.auth.updateUser({
@@ -119,21 +123,37 @@ async function updatePassword() {
     });
 
   if (error) {
-    showMessage(error.message);
+
+    showMessage(
+      error.message
+    );
+
     return;
   }
+
 
   showMessage(
     "Password updated successfully",
     "success"
   );
 
+
   setTimeout(() => {
-    window.location.href = "index.html";
+
+    window.location.href =
+      "index.html";
+
   }, 2000);
 
 }
 
+
+document
+.getElementById("resetBtn")
+.addEventListener(
+  "click",
+  updatePassword
+);
 document
   .getElementById("resetBtn")
   .addEventListener("click", updatePassword);
