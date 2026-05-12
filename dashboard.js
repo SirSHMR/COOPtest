@@ -15,28 +15,28 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
-// --- نظام المفتاح الرئيسي للشركة ---
+// Company Master Key System
 let companyMasterKey = null;
 let masterKeyPromise = null;
 
-// اشتقاق مفتاح من كلمة مرور الشركة
+// Deriving a key from the company password
 async function getCompanyMasterKey() {
-  // إذا كان المفتاح محفوظاً في الذاكرة
+  // If the key is stored in memory
   if (companyMasterKey) return companyMasterKey;
   
-  // منع طلبات متعددة في نفس الوقت
+  // Prevent multiple requests at the same time
   if (masterKeyPromise) return masterKeyPromise;
   
   masterKeyPromise = (async () => {
     try {
-      // 1. طلب كلمة مرور الشركة من المستخدم
+      // 1. Requesting the company password from the user
       const companyPassword = prompt("Enter the company password:\n\nThis password is used to encrypt and decrypt all files in the system.");
       
       if (!companyPassword) {
-        throw new Error("كلمة مرور الشركة مطلوبة");
+        throw new Error("Company password required");
       }
       
-      // 2. اشتقاق مفتاح التشفير من كلمة مرور الشركة
+      // 2. Deriving the encryption key from the company password
       const encoder = new TextEncoder();
       const keyMaterial = await crypto.subtle.importKey(
         "raw",
@@ -49,7 +49,7 @@ async function getCompanyMasterKey() {
       companyMasterKey = await crypto.subtle.deriveKey(
         {
           name: "PBKDF2",
-          salt: encoder.encode("CompanyFileSystemSalt"), // Salt ثابت للشركة
+          salt: encoder.encode("CompanyFileSystemSalt"), 
           iterations: 100000,
           hash: "SHA-256"
         },
@@ -170,7 +170,7 @@ function clearKeyCache() {
 const SUPABASE_URL = "https://fucddnhmxhskmzmhmzyw.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1Y2RkbmhteGhza216bWhtenl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM0NzcyMjUsImV4cCI6MjA3OTA1MzIyNX0.TvLGcHwQGNWxfBb54A3Z-3s9bFEHiLPBBHPzqOuoqeo";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Messages
 function showMessage(text, type = "error") {
@@ -201,7 +201,7 @@ async function loadEmployees() {
   const employeesList = document.getElementById('employeesList');
   employeesList.innerHTML = '';
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("employees")
     .select("id, name, email");
 
@@ -257,14 +257,14 @@ async function encryptAndSendFile() {
   if (!sendToAll && selectedEmployees.length === 0) return showMessage("Please select at least one employee");
 
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await client.auth.getUser();
     if (userError || !user) {
       showMessage("Please login again");
       return;
     }
 
-    // الحصول على اسم المرسل (الموظف الحالي)
-    const { data: currentEmployee, error: empError } = await supabase
+    // Obtain the sender's name (current employee).
+    const { data: currentEmployee, error: empError } = await client
       .from("employees")
       .select("name")
       .eq("id", user.id)
@@ -291,7 +291,7 @@ async function encryptAndSendFile() {
       timeZone: 'Asia/Riyadh'
     });
     
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await client.storage
       .from("files")
       .upload(fileName, combined.buffer);
 
@@ -304,7 +304,7 @@ async function encryptAndSendFile() {
     // Get all employees if "Send to All" is selected
     let employeeData = [];
     if (sendToAll) {
-      const { data: allEmployees, error: empError } = await supabase
+      const { data: allEmployees, error: empError } = await client
         .from("employees")
         .select("id, name");
       
@@ -315,8 +315,8 @@ async function encryptAndSendFile() {
       
       employeeData = allEmployees;
     } else {
-      // الحصول على بيانات الموظفين المختارين (الأسماء والمعرفات)
-      const { data: selectedEmployeesData, error: selError } = await supabase
+      // Obtain data on selected employees (names and IDs)
+      const { data: selectedEmployeesData, error: selError } = await client
         .from("employees")
         .select("id, name")
         .in("id", selectedEmployees);
@@ -344,7 +344,7 @@ async function encryptAndSendFile() {
     }));
 
     // Insert records into shared_files table
-    const { error: dbError } = await supabase
+    const { error: dbError } = await client
       .from("shared_files")
       .insert(fileRecords);
 
@@ -353,7 +353,7 @@ async function encryptAndSendFile() {
       showMessage("Database error: " + dbError.message);
       
       // Try to delete the uploaded file if DB insertion fails
-      await supabase.storage.from("files").remove([uploadData.path]);
+      await client.storage.from("files").remove([uploadData.path]);
       return;
     }
 
@@ -387,7 +387,7 @@ async function encryptAndSendFile() {
 // Load received files
 async function loadReceivedFiles() {
   try {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const { data: userData, error: userError } = await client.auth.getUser();
     if (userError || !userData.user) {
       console.error("Auth error:", userError);
       showMessage("Please login again");
@@ -397,7 +397,7 @@ async function loadReceivedFiles() {
     const currentUser = userData.user;
 
     // Get files where current user is either recipient or sender
-    const { data: files, error } = await supabase
+    const { data: files, error } = await client
       .from("shared_files")
       .select("*")
       .or(`allowed_user_id.eq.${currentUser.id},uploaded_by.eq.${currentUser.id}`)
@@ -423,7 +423,7 @@ async function loadReceivedFiles() {
 
     if (receivedFiles.length > 0) {
       const receivedHeader = document.createElement("h3");
-      receivedHeader.textContent = "Received Files";
+      receivedHeader.textContent = "Received Documents";
       receivedHeader.style.marginTop = "20px";
       receivedHeader.style.color = "#333";
       receivedList.appendChild(receivedHeader);
@@ -444,7 +444,7 @@ async function loadReceivedFiles() {
 
     if (sentFiles.length > 0) {
       const sentHeader = document.createElement("h3");
-      sentHeader.textContent = "Sent Files";
+      sentHeader.textContent = "Sent Documents";
       sentHeader.style.marginTop = "20px";
       sentHeader.style.color = "#333";
       receivedList.appendChild(sentHeader);
@@ -472,7 +472,7 @@ async function loadReceivedFiles() {
 // Download file
 async function downloadFile(path, fileName, encryptedFileKey, keyIv) {
   try {
-    const { data, error } = await supabase.storage.from("files").download(path);
+    const { data, error } = await client.storage.from("files").download(path);
     if (error) return showMessage("Error downloading file: " + error.message);
 
     const arrayBuffer = await data.arrayBuffer();
@@ -508,7 +508,7 @@ async function downloadFile(path, fileName, encryptedFileKey, keyIv) {
 // Logout
 async function logout() {
   clearKeyCache(); // Clear encryption key from memory
-  await supabase.auth.signOut();
+  await client.auth.signOut();
   window.location.href = "index.html";
 }
 
@@ -519,7 +519,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     clearKeyCache();
     
     // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await client.auth.getUser();
     if (!user) {
       window.location.href = "index.html";
       return;
