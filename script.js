@@ -170,7 +170,7 @@ document
       email,
       {
         redirectTo:
-        ""https://sirshmr.github.io/COOPtest/""
+        "https://sirshmr.github.io/COOPtest/"
       }
     );
 
