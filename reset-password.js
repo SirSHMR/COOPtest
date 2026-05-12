@@ -6,6 +6,34 @@ const client = window.supabase.createClient(
   SUPABASE_ANON_KEY
 );
 
+// تجهيز session من رابط recovery
+async function initializeRecoverySession() {
+
+  const hash = window.location.hash.substring(1);
+  const params = new URLSearchParams(hash);
+
+  const access_token = params.get("access_token");
+  const refresh_token = params.get("refresh_token");
+
+  if (!access_token || !refresh_token) {
+    showMessage("Invalid or expired reset link");
+    return false;
+  }
+
+  const { error } = await client.auth.setSession({
+    access_token,
+    refresh_token
+  });
+
+  if (error) {
+    showMessage("Recovery link expired");
+    return false;
+  }
+
+  return true;
+}
+
+
 function showMessage(text, type = "error") {
   const msg = document.getElementById("message");
 
@@ -14,7 +42,13 @@ function showMessage(text, type = "error") {
   msg.style.display = "block";
 }
 
+
 async function updatePassword() {
+
+  const sessionReady =
+    await initializeRecoverySession();
+
+  if (!sessionReady) return;
 
   const password =
     document.getElementById("newPassword").value.trim();
@@ -22,18 +56,8 @@ async function updatePassword() {
   const confirmPassword =
     document.getElementById("confirmPassword").value.trim();
 
-  if (!password || !confirmPassword) {
-    showMessage("Please fill all fields");
-    return;
-  }
-
   if (password !== confirmPassword) {
     showMessage("Passwords do not match");
-    return;
-  }
-
-  if (password.length < 8) {
-    showMessage("Password must be at least 8 characters");
     return;
   }
 
@@ -55,6 +79,7 @@ async function updatePassword() {
   setTimeout(() => {
     window.location.href = "index.html";
   }, 2000);
+
 }
 
 document
