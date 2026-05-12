@@ -146,16 +146,22 @@ document.addEventListener("DOMContentLoaded", function () {
     if (e.key === "Enter") loginUser();
   });
 });
+let resetInProgress = false;
 
 document
 .getElementById("forgotPassword")
 .addEventListener("click", async () => {
+
+  if (resetInProgress) return;
+
+  resetInProgress = true;
 
   const email =
     document.getElementById("Email").value.trim();
 
   if (!email) {
     showMessage("Enter your email first");
+    resetInProgress = false;
     return;
   }
 
@@ -164,12 +170,13 @@ document
       email,
       {
         redirectTo:
-        "https://sirshmr.github.io/COOPtest/"
+        ""https://sirshmr.github.io/COOPtest/""
       }
     );
 
   if (error) {
     showMessage(error.message);
+    resetInProgress = false;
     return;
   }
 
@@ -177,5 +184,9 @@ document
     "Password reset link sent",
     "success"
   );
+
+  setTimeout(() => {
+    resetInProgress = false;
+  }, 30000);
 
 });
