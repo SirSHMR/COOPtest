@@ -345,3 +345,16 @@ input[type="file"]::file-selector-button {
 input[type="file"]::file-selector-button:hover {
   background: #0056b3;
 }
+.forgot-link {
+  display: block;
+  margin-top: 15px;
+  color: #007bff;
+  font-size: 14px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+  color: #0056b3;
+}
