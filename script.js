@@ -165,28 +165,25 @@ document
     return;
   }
 
-  const { error } =
-    await clientt.auth.resetPasswordForEmail(
-      email,
-      {
-        redirectTo:
-        "https://sirshmr.github.io/COOPtest/"
-      }
-    );
-
-  if (error) {
-    showMessage(error.message);
-    resetInProgress = false;
-    return;
-  }
-
-  showMessage(
-    "Password reset link sent",
-    "success"
+  const result =
+  await clientt.auth.resetPasswordForEmail(
+    email,
+    {
+      redirectTo:
+      "https://coo-ptest.vercel.app/reset-password.html"
+    }
   );
 
-  setTimeout(() => {
-    resetInProgress = false;
-  }, 30000);
+console.log("RESET RESULT:", result);
+
+if (result.error) {
+  showMessage(result.error.message);
+  return;
+}
+
+showMessage(
+  "Password reset link sent",
+  "success"
+);
 
 });
