@@ -164,7 +164,7 @@ document
       email,
       {
         redirectTo:
-        "https://YOUR_GITHUB_LINK/reset-password.html"
+        "https://sirshmr.github.io/COOPtest/"
       }
     );
 
