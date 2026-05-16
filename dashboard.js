@@ -1,7 +1,7 @@
 // --- AES Encryption Helpers (Company Master Key) ---
 
 // Convert ArrayBuffer ↔ Base64
-function arrayBuffeToBase64(buffer) {
+function arrayBufferToBase64(buffer) {
   let binary = "";
   const bytes = new Uint8Array(buffer);
   bytes.forEach(byte => binary += String.fromCharCode(byte));
@@ -70,33 +70,6 @@ async function getCompanyMasterKey() {
   return masterKeyPromise;
 }
 
-async function getChaosSecretKey() {
-
-  const masterKey = await getCompanyMasterKey();
-
-  const rawKey = await crypto.subtle.exportKey(
-    "raw",
-    masterKey
-  );
-
-  const keyBytes = new Uint8Array(rawKey);
-
-  let sum = 0;
-
-  for (let i = 0; i < keyBytes.length; i++) {
-    sum += keyBytes[i];
-  }
-
-  let secretKey =
-    (sum % 1000000) / 1000000;
-
-  if (secretKey <= 0) {
-    secretKey = 0.357;
-  }
-
-  return secretKey;
-}
-
 // Generate per-file unique encryption key
 async function generateFileKey() {
   return await crypto.subtle.generateKey(
@@ -108,233 +81,82 @@ async function generateFileKey() {
 
 // Encrypt file → returns encrypted ArrayBuffer + IV + encrypted file key
 async function encryptFile(file) {
-
   try {
-
-    if (!file.type.startsWith("image/")) {
-      throw new Error(
-        "Only images are allowed"
-      );
-    }
-
-    const secretKey =
-      await getChaosSecretKey();
-
-    const fileBuffer =
-      await file.arrayBuffer();
-
-    const imgBytes =
-      new Uint8Array(fileBuffer);
-
-    const N = imgBytes.length;
-
-    const r = 3.99;
-
-    // Chaos sequence
-    const chaos = new Array(N);
-
-    chaos[0] = secretKey;
-
-    for (let i = 1; i < N; i++) {
-      chaos[i] =
-        r *
-        chaos[i - 1] *
-        (1 - chaos[i - 1]);
-    }
-
-    // Permutation
-    const permIndex =
-      [...Array(N).keys()];
-
-    permIndex.sort(
-      (a, b) =>
-        chaos[a] - chaos[b]
+    // 1. Generate unique key for this file
+    const fileKey = await generateFileKey();
+    
+    // 2. Encrypt file with the unique key
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const fileBuffer = await file.arrayBuffer();
+    const encrypted = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv },
+      fileKey,
+      fileBuffer
     );
-
-    const permuted =
-      new Uint8Array(N);
-
-    for (let i = 0; i < N; i++) {
-      permuted[i] =
-        imgBytes[permIndex[i]];
-    }
-
-    // Diffusion key
-    const keyVec =
-      chaos.map(
-        x =>
-          Math.floor(
-            x * 1e14
-          ) % 256
-      );
-
-    // Diffusion
-    const encrypted =
-      new Uint8Array(N);
-
-    encrypted[0] =
-      permuted[0] ^
-      keyVec[0];
-
-    for (let i = 1; i < N; i++) {
-
-      encrypted[i] =
-        permuted[i] ^
-        keyVec[i] ^
-        encrypted[i - 1];
-    }
-
-    // نفس نظام حفظ key القديم
-    const fileKey =
-      await generateFileKey();
-
-    const masterKey =
-      await getCompanyMasterKey();
-
-    const keyIv =
-      crypto.getRandomValues(
-        new Uint8Array(12)
-      );
-
-    const exportedFileKey =
-      await crypto.subtle.exportKey(
-        "raw",
-        fileKey
-      );
-
-    const encryptedFileKey =
-      await crypto.subtle.encrypt(
-        {
-          name: "AES-GCM",
-          iv: keyIv
-        },
-        masterKey,
-        exportedFileKey
-      );
-
+    
+    // 3. Get company master key to encrypt the file key
+    const masterKey = await getCompanyMasterKey();
+    
+    // 4. Encrypt the file key with company master key
+    const keyIv = crypto.getRandomValues(new Uint8Array(12));
+    const exportedFileKey = await crypto.subtle.exportKey("raw", fileKey);
+    const encryptedFileKey = await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv: keyIv },
+      masterKey,
+      exportedFileKey
+    );
+    
     return {
-
       encrypted,
-
-      iv: new Uint8Array(12),
-
-      encryptedFileKey:
-        arrayBufferToBase64(
-          encryptedFileKey
-        ),
-
-      keyIv:
-        arrayBufferToBase64(
-          keyIv
-        ),
-
-      permutation:
-        btoa(
-          JSON.stringify(
-            permIndex
-          )
-        )
+      iv,
+      encryptedFileKey: arrayBufferToBase64(encryptedFileKey),
+      keyIv: arrayBufferToBase64(keyIv)
     };
-
   } catch (error) {
-
-    throw new Error(
-      "Failed to encrypt image: " +
-      error.message
-    );
+    console.error("Error encrypting file:", error);
+    throw new Error("Failed to encrypt file: " + error.message);
   }
 }
 
 // Decrypt file key then file
-async function decryptFile(
-  buffer,
-  iv,
-  encryptedFileKeyBase64,
-  keyIvBase64,
-  permutationBase64
-) {
-
+async function decryptFile(buffer, iv, encryptedFileKeyBase64, keyIvBase64) {
   try {
-
-    await getCompanyMasterKey();
-
-    const secretKey =
-      await getChaosSecretKey();
-
-    const encrypted =
-      new Uint8Array(buffer);
-
-    const N =
-      encrypted.length;
-
-    const r = 3.99;
-
-    const chaos =
-      new Array(N);
-
-    chaos[0] =
-      secretKey;
-
-    for (let i = 1; i < N; i++) {
-
-      chaos[i] =
-        r *
-        chaos[i - 1] *
-        (1 - chaos[i - 1]);
-    }
-
-    const keyVec =
-      chaos.map(
-        x =>
-          Math.floor(
-            x * 1e14
-          ) % 256
-      );
-
-    // Reverse diffusion
-    const diff =
-      new Uint8Array(N);
-
-    diff[0] =
-      encrypted[0] ^
-      keyVec[0];
-
-    for (let i = 1; i < N; i++) {
-
-      diff[i] =
-        encrypted[i] ^
-        keyVec[i] ^
-        encrypted[i - 1];
-    }
-
-    // Reverse permutation
-    const permIndex =
-      JSON.parse(
-        atob(
-          permutationBase64
-        )
-      );
-
-    const original =
-      new Uint8Array(N);
-
-    for (let i = 0; i < N; i++) {
-
-      original[
-        permIndex[i]
-      ] = diff[i];
-    }
-
-    return new Blob(
-      [original]
+    // 1. Get company master key
+    const masterKey = await getCompanyMasterKey();
+    
+    // 2. Decrypt the file key
+    const encryptedFileKey = base64ToArrayBuffer(encryptedFileKeyBase64);
+    const keyIv = base64ToArrayBuffer(keyIvBase64);
+    
+    const decryptedFileKeyBuffer = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: keyIv },
+      masterKey,
+      encryptedFileKey
     );
-
+    
+    // 3. Import the decrypted file key
+    const fileKey = await crypto.subtle.importKey(
+      "raw",
+      decryptedFileKeyBuffer,
+      "AES-GCM",
+      false,
+      ["decrypt"]
+    );
+    
+    // 4. Decrypt the file content
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      fileKey,
+      buffer
+    );
+    
+    return new Blob([decrypted]);
   } catch (error) {
-
-    throw new Error(
-      "Decrypt failed: " +
-      error.message
-    );
+    console.error("Error decrypting file:", error);
+    if (error.name === "OperationError") {
+      throw new Error("Company password is incorrect or file is corrupted");
+    }
+    throw error;
   }
 }
 
@@ -518,8 +340,7 @@ async function encryptAndSendFile() {
       sender_name: senderName,
       receiver_name: employee.name,
       encrypted_file_key: encryptedFileKey, // Store encrypted file key
-      key_iv: keyIv, // Store IV for file key decryption
-      permutation_key: permutation
+      key_iv: keyIv // Store IV for file key decryption
     }));
 
     // Insert records into shared_files table
@@ -663,14 +484,8 @@ async function downloadFile(path, fileName, encryptedFileKey, keyIv) {
     const encrypted = arrayBuffer.slice(12);
 
     // Decrypt WITH ENCRYPTED FILE KEY SYSTEM
-    const blob =
-  await decryptFile(
-    encrypted,
-    iv,
-    encryptedFileKey,
-    keyIv,
-    permutationKey
-  );
+    const blob = await decryptFile(encrypted, iv, encryptedFileKey, keyIv);
+
     // Download
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
